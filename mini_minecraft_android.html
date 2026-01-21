@@ -3,23 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft Mobile - Full World View</title>
+    <title>Minecraft Mobile - Clean Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
+        
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* Керування */
         .touch-btn { position: absolute; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.5); border-radius: 8px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
         #btn-up { bottom: 130px; left: 85px; width: 55px; height: 55px; }
         #btn-down { bottom: 20px; left: 85px; width: 55px; height: 55px; }
         #btn-left { bottom: 75px; left: 20px; width: 55px; height: 55px; }
         #btn-right { bottom: 75px; left: 150px; width: 55px; height: 55px; }
+        
+        /* Дії */
         .action-btn { position: absolute; border-radius: 50%; border: 2px solid white; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
         #btn-jump { bottom: 30px; right: 130px; width: 70px; height: 70px; background: rgba(255,255,255,0.2); }
         #btn-build { bottom: 110px; right: 30px; width: 80px; height: 80px; background: rgba(76, 175, 80, 0.7); }
         #btn-destroy { bottom: 20px; right: 30px; width: 80px; height: 80px; background: rgba(244, 67, 54, 0.7); }
+
+        /* Інвентар */
         #inventory { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 10px; }
         .slot { width: 40px; height: 40px; border: 2px solid #444; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
         .slot.active { border-color: #fff; box-shadow: 0 0 10px #fff; }
+
         #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid white; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.8; }
     </style>
 </head>
@@ -34,8 +42,10 @@
         <div class="slot" onclick="window.setBlock(3)"><div style="width:25px;height:25px;background:#808080"></div></div>
         <div class="slot" onclick="window.setBlock(5)"><div style="width:25px;height:25px;background:#1e88e5"></div></div>
     </div>
-    <div class="touch-btn" id="btn-up">W</div><div class="touch-btn" id="btn-down">S</div>
-    <div class="touch-btn" id="btn-left">A</div><div class="touch-btn" id="btn-right">D</div>
+    <div class="touch-btn" id="btn-up">W</div>
+    <div class="touch-btn" id="btn-down">S</div>
+    <div class="touch-btn" id="btn-left">A</div>
+    <div class="touch-btn" id="btn-right">D</div>
     <div class="action-btn" id="btn-build">BUILD</div>
     <div class="action-btn" id="btn-destroy">KILL</div>
     <div class="action-btn" id="btn-jump">JUMP</div>
@@ -52,43 +62,44 @@
     let move = { f: 0, b: 0, l: 0, r: 0 };
     let velocity = new THREE.Vector3(0, 0, 0);
     let canJump = false, isInWater = false;
-    let objects = [], pigs = [];
+    let objects = [];
     let selectedBlock = 1, lastTouchX = 0, lastTouchY = 0;
 
     const mapSize = 50;
     const playerHeight = 1.7;
-    const blockColors = { 1: 0x5d8233, 2: 0x795548, 3: 0x808080, 4: 0x614126, 5: 0x1e88e5, 6: 0x2e7d32, 7: 0xffffff };
+    const blockColors = { 1: 0x5d8233, 2: 0x795548, 3: 0x808080, 4: 0x614126, 5: 0x1e88e5, 6: 0x2e7d32 };
 
     init();
 
     function init() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
-        // ЗБІЛЬШЕНО ТУМАН (щоб бачити далі)
         scene.fog = new THREE.Fog(0x87ceeb, 30, 80);
         
         camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         pitchObj = new THREE.Object3D(); pitchObj.add(camera);
         yawObj = new THREE.Object3D(); yawObj.add(pitchObj);
-        
-        // ФІКСОВАННИЙ СПАВН
         yawObj.position.set(10, 5, 10); 
         scene.add(yawObj);
 
         renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1.5 : 1); // Оптимізація
         document.body.appendChild(renderer.domElement);
 
+        // ФІКС ПЕРЕВОРОТУ ЕКРАНУ
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onWindowResize, 200); // Невелика затримка для стабілізації
+        });
+
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-        let sun = new THREE.DirectionalLight(0xffffff, 0.5);
+        let sun = new THREE.DirectionalLight(0xffffff, 0.4);
         sun.position.set(10, 50, 10);
         scene.add(sun);
 
         raycaster = new THREE.Raycaster();
-
         generateWorld();
-        for(let i=0; i<6; i++) createPig(15 + Math.random()*20, 1, 15 + Math.random()*20);
+        loop();
 
         // Керування
         const setupBtn = (id, key) => {
@@ -123,16 +134,16 @@
                 s.classList.toggle('active', map[i] === id);
             });
         };
+    }
 
-        loop();
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
     function addBlock(x, y, z, type, collidable = true) {
-        const mat = new THREE.MeshLambertMaterial({ 
-            color: blockColors[type], 
-            transparent: type===5, 
-            opacity: type===5?0.6:1 
-        });
+        const mat = new THREE.MeshLambertMaterial({ color: blockColors[type], transparent: type===5, opacity: type===5?0.6:1 });
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), mat);
         mesh.position.set(Math.floor(x), Math.floor(y), Math.floor(z));
         mesh.userData.type = type;
@@ -146,42 +157,26 @@
             for(let z=0; z<mapSize; z++) {
                 const dist = Math.sqrt((x-25)**2 + (z-25)**2);
                 if (dist < 8) { 
-                    addBlock(x, -1, z, 3); addBlock(x, 0, z, 5, false); // Озеро (без колізії)
+                    addBlock(x, -1, z, 3); addBlock(x, 0, z, 5, false);
                 } else { 
-                    addBlock(x, -1, z, 2); addBlock(x, 0, z, 1); // Земля та Трава
-                    if (Math.random() > 0.985 && dist > 10) { // Дерева
+                    addBlock(x, -1, z, 2); addBlock(x, 0, z, 1);
+                    if (Math.random() > 0.985 && dist > 10) {
                         let h = 3;
                         for(let i=1; i<=h; i++) addBlock(x, i, z, 4);
                         for(let lx=-1; lx<=1; lx++) for(let lz=-1; lz<=1; lz++) addBlock(x+lx, h+1, z+lz, 6);
                         addBlock(x, h+2, z, 6);
                     }
                 }
-                // ДОДАНО ХМАРИ
-                if (Math.random() > 0.995) {
-                    for(let cx=0; cx<3; cx++) addBlock(x+cx, 15 + Math.random()*2, z, 7, false);
-                }
             }
         }
-    }
-
-    function createPig(x, y, z) {
-        const group = new THREE.Group();
-        const mat = new THREE.MeshLambertMaterial({color: 0xffadc7});
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.9), mat); body.position.y = 0.5;
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat); head.position.set(0, 0.7, 0.5);
-        group.add(body, head); group.position.set(x, y, z);
-        scene.add(group);
-        pigs.push({ mesh: group, dir: new THREE.Vector3(1, 0, 0), timer: 0, targetRot: 0 });
     }
 
     function checkColl(pos) {
         isInWater = false;
         for(let obj of objects) {
-            if(!obj.userData.collidable) continue;
             let dx = Math.abs(pos.x - obj.position.x), dy = Math.abs((pos.y - playerHeight/2) - obj.position.y), dz = Math.abs(pos.z - obj.position.z);
             if(dx < 0.7 && dz < 0.7 && dy < 1.2) return true;
         }
-        // Перевірка на воду окремо (вона в сцені, але не в масиві objects для колізій)
         const centerDist = Math.sqrt((pos.x-25)**2 + (pos.z-25)**2);
         if(centerDist < 8.5 && pos.y < 1.5) isInWater = true;
         return false;
@@ -216,30 +211,12 @@
         yawObj.position.y += velocity.y;
         if(checkColl(yawObj.position)) { if(velocity.y < 0) canJump = true; yawObj.position.y = oldP.y; velocity.y = 0; }
 
-        pigs.forEach(pig => {
-            pig.timer--;
-            if(pig.timer <= 0) {
-                pig.dir.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
-                pig.targetRot = Math.atan2(pig.dir.x, pig.dir.z);
-                pig.timer = 150 + Math.random()*200;
-            }
-            let angleDiff = pig.targetRot - pig.mesh.rotation.y;
-            while(angleDiff < -Math.PI) angleDiff += Math.PI*2;
-            while(angleDiff > Math.PI) angleDiff -= Math.PI*2;
-            pig.mesh.rotation.y += angleDiff * 0.04;
-            let pOld = pig.mesh.position.clone();
-            pig.mesh.position.add(pig.dir.clone().multiplyScalar(0.025));
-            let d = Math.sqrt((pig.mesh.position.x-25)**2 + (pig.mesh.position.z-25)**2);
-            if(d < 9 || pig.mesh.position.x<2 || pig.mesh.position.x>48 || pig.mesh.position.z<2 || pig.mesh.position.z>48) {
-                pig.mesh.position.copy(pOld); pig.timer = 0;
-            }
-        });
-
         renderer.render(scene, camera);
     }
 </script>
 </body>
 </html>
+
 
 
 
