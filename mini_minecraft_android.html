@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft Mobile - Lake & Water</title>
+    <title>Minecraft Mobile - Pig Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
@@ -33,7 +33,8 @@
         <div class="slot" onclick="window.setBlock(3)"><div class="block-preview" style="background: #808080;"></div></div>
         <div class="slot" onclick="window.setBlock(4)"><div class="block-preview" style="background: #614126;"></div></div>
         <div class="slot" onclick="window.setBlock(6)"><div class="block-preview" style="background: #2e7d32;"></div></div>
-        <div class="slot" onclick="window.setBlock(5)"><div class="block-preview" style="background: #1e88e5; opacity: 0.7;"></div></div> </div>
+        <div class="slot" onclick="window.setBlock(5)"><div class="block-preview" style="background: #1e88e5; opacity: 0.7;"></div></div>
+    </div>
     <div class="touch-btn" id="btn-up">W</div>
     <div class="touch-btn" id="btn-down">S</div>
     <div class="touch-btn" id="btn-left">A</div>
@@ -53,16 +54,12 @@
     let scene, camera, renderer, yawObj, pitchObj, raycaster;
     let move = { f: 0, b: 0, l: 0, r: 0 };
     let velocity = new THREE.Vector3(0, 0, 0);
-    let canJump = false;
-    let isInWater = false;
-    let objects = [];
-    let selectedBlock = 1;
-    let lastTouchX = 0, lastTouchY = 0;
+    let canJump = false, isInWater = false;
+    let objects = [], pigs = [];
+    let selectedBlock = 1, lastTouchX = 0, lastTouchY = 0;
 
     const mapSize = 50;
-    const playerRadius = 0.35;
-    const playerHeight = 1.7;
-
+    const playerRadius = 0.35, playerHeight = 1.7;
     const blockColors = { 1: 0x5d8233, 2: 0x795548, 3: 0x808080, 4: 0x614126, 5: 0x1e88e5, 6: 0x2e7d32 };
 
     init();
@@ -73,12 +70,9 @@
         scene.fog = new THREE.Fog(0x87ceeb, 25, 75);
         
         camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        pitchObj = new THREE.Object3D();
-        pitchObj.add(camera);
-        yawObj = new THREE.Object3D();
-        yawObj.add(pitchObj);
-        yawObj.position.set(5, 5, 5); // Початок біля берега
-        scene.add(yawObj);
+        pitchObj = new THREE.Object3D(); pitchObj.add(camera);
+        yawObj = new THREE.Object3D(); yawObj.add(pitchObj);
+        yawObj.position.set(5, 5, 5); scene.add(yawObj);
 
         renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -94,6 +88,7 @@
         raycaster = new THREE.Raycaster();
 
         generateWorld();
+        createPig(10, 1, 10); // Створюємо свинку
 
         // Керування
         const setupBtn = (id, key) => {
@@ -105,73 +100,65 @@
         setupBtn('btn-left', 'l'); setupBtn('btn-right', 'r');
 
         document.getElementById('btn-jump').addEventListener('touchstart', (e) => { 
-            e.preventDefault(); e.stopPropagation(); 
-            if(canJump || isInWater) { velocity.y = isInWater ? 0.1 : 0.22; canJump = false; }
+            e.preventDefault(); e.stopPropagation(); if(canJump || isInWater) { velocity.y = isInWater ? 0.08 : 0.22; canJump = false; }
         });
         document.getElementById('btn-build').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); interact(true); });
         document.getElementById('btn-destroy').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); interact(false); });
 
         document.addEventListener('touchstart', (e) => {
             if (e.target.closest('.touch-btn') || e.target.closest('.action-btn') || e.target.closest('.slot')) return;
-            lastTouchX = e.touches[0].clientX;
-            lastTouchY = e.touches[0].clientY;
+            lastTouchX = e.touches[0].clientX; lastTouchY = e.touches[0].clientY;
         });
 
         document.addEventListener('touchmove', (e) => {
             if (e.target.closest('.touch-btn') || e.target.closest('.action-btn') || e.target.closest('.slot')) return;
             const touch = e.touches[0];
-            const dx = touch.clientX - lastTouchX;
-            const dy = touch.clientY - lastTouchY;
-            yawObj.rotation.y -= dx * 0.006;
-            pitchObj.rotation.x -= dy * 0.006;
+            const dx = touch.clientX - lastTouchX; const dy = touch.clientY - lastTouchY;
+            yawObj.rotation.y -= dx * 0.006; pitchObj.rotation.x -= dy * 0.006;
             pitchObj.rotation.x = Math.max(-1.5, Math.min(1.5, pitchObj.rotation.x));
             lastTouchX = touch.clientX; lastTouchY = touch.clientY;
         }, { passive: false });
 
-        window.setBlock = (id) => {
-            selectedBlock = id;
-            document.querySelectorAll('.slot').forEach((s, i) => {
-                const isActive = (id === 1 && i === 0) || (id === 3 && i === 1) || (id === 4 && i === 2) || (id === 6 && i === 3) || (id === 5 && i === 4);
-                s.classList.toggle('active', isActive);
-            });
-        };
+        window.setBlock = (id) => { selectedBlock = id; };
 
         loop();
     }
 
+    function createPig(x, y, z) {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshLambertMaterial({color: 0xffadc7});
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 1.2), mat);
+        body.position.y = 0.6;
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mat);
+        head.position.set(0, 0.8, 0.7);
+        group.add(body, head);
+        group.position.set(x, y, z);
+        scene.add(group);
+        pigs.push({
+            mesh: group,
+            dir: new THREE.Vector3(1, 0, 0),
+            timer: 0
+        });
+    }
+
     function addBlock(x, y, z, type) {
         const isWater = type === 5;
-        const material = new THREE.MeshLambertMaterial({ 
-            color: blockColors[type], 
-            transparent: isWater, 
-            opacity: isWater ? 0.6 : 1 
-        });
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), material);
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({ color: blockColors[type], transparent: isWater, opacity: isWater ? 0.6 : 1 }));
         mesh.position.set(Math.floor(x), Math.floor(y), Math.floor(z));
         mesh.userData.type = type;
-        scene.add(mesh);
-        objects.push(mesh);
+        scene.add(mesh); objects.push(mesh);
     }
 
     function generateWorld() {
         const center = mapSize / 2;
-        const lakeRadius = 8;
-
         for(let x=0; x<mapSize; x++) {
             for(let z=0; z<mapSize; z++) {
-                const dist = Math.sqrt(Math.pow(x - center, 2) + Math.pow(z - center, 2));
-                
-                if (dist < lakeRadius) {
-                    // Озеро
-                    addBlock(x, -1, z, 3); // Дно з каменю
-                    addBlock(x, 0, z, 5);  // Вода
-                } else {
-                    // Суша
+                const dist = Math.sqrt((x-center)**2 + (z-center)**2);
+                if (dist < 8) { addBlock(x, -1, z, 3); addBlock(x, 0, z, 5); }
+                else { 
                     addBlock(x, 0, z, 1);
-                    // Випадкові дерева на суші
-                    if(Math.random() > 0.985 && dist > lakeRadius + 2) {
-                        const h = 3 + Math.floor(Math.random()*2);
-                        for(let i=1; i<=h; i++) addBlock(x, i, z, 4);
+                    if(Math.random() > 0.99 && dist > 10) {
+                        const h = 3; for(let i=1; i<=h; i++) addBlock(x, i, z, 4);
                         for(let lx=-1; lx<=1; lx++) for(let lz=-1; lz<=1; lz++) addBlock(x+lx, h+1, z+lz, 6);
                     }
                 }
@@ -179,18 +166,12 @@
         }
     }
 
-    function checkCollision(pos) {
-        isInWater = false;
+    function checkCollision(pos, radius = playerRadius, height = playerHeight, ignoreWater = false) {
         for(let obj of objects) {
-            let dx = Math.abs(pos.x - obj.position.x);
-            let dy = Math.abs((pos.y - playerHeight/2) - obj.position.y);
-            let dz = Math.abs(pos.z - obj.position.z);
-            
-            if(dx < 0.5 + playerRadius && dz < 0.5 + playerRadius && dy < 0.5 + playerHeight/2) {
-                if(obj.userData.type === 5) {
-                    isInWater = true; // Ми у воді, але вона не блокує
-                    continue;
-                }
+            if(ignoreWater && obj.userData.type === 5) continue;
+            let dx = Math.abs(pos.x - obj.position.x), dy = Math.abs((pos.y - height/2) - obj.position.y), dz = Math.abs(pos.z - obj.position.z);
+            if(dx < 0.5 + radius && dz < 0.5 + radius && dy < 0.5 + height/2) {
+                if(!ignoreWater && obj.userData.type === 5) { isInWater = true; continue; }
                 return true;
             }
         }
@@ -201,42 +182,54 @@
         raycaster.setFromCamera({x: 0, y: 0}, camera);
         const hits = raycaster.intersectObjects(objects);
         if (hits.length > 0 && hits[0].distance < 6) {
-            if (isPlace) {
-                const p = hits[0].object.position.clone().add(hits[0].face.normal);
-                addBlock(p.x, p.y, p.z, selectedBlock);
-            } else {
-                if(hits[0].object.position.y < 0) return;
-                scene.remove(hits[0].object);
-                objects = objects.filter(o => o !== hits[0].object);
-            }
+            if (isPlace) { const p = hits[0].object.position.clone().add(hits[0].face.normal); addBlock(p.x, p.y, p.z, selectedBlock); }
+            else { if(hits[0].object.position.y === 0 && hits[0].object.userData.type !== 5) return; scene.remove(hits[0].object); objects = objects.filter(o => o !== hits[0].object); }
         }
     }
 
     function loop() {
         requestAnimationFrame(loop);
         let oldPos = yawObj.position.clone();
+        isInWater = false;
         
-        // Фізика води
-        const gravity = isInWater ? 0.002 : 0.01;
-        velocity.y -= gravity;
-        if(isInWater && velocity.y < -0.05) velocity.y = -0.05; // Повільне занурення
-
+        // Фізика гравця
+        velocity.y -= isInWater ? 0.005 : 0.01;
         let speed = isInWater ? 0.07 : 0.14;
-        let moveVec = new THREE.Vector3(move.r - move.l, 0, move.b - move.f);
-        moveVec.applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(speed);
+        let moveVec = new THREE.Vector3(move.r - move.l, 0, move.b - move.f).applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(speed);
+        
+        yawObj.position.x += moveVec.x; if(checkCollision(yawObj.position)) yawObj.position.x = oldPos.x;
+        yawObj.position.z += moveVec.z; if(checkCollision(yawObj.position)) yawObj.position.z = oldPos.z;
+        
+        canJump = false; yawObj.position.y += velocity.y;
+        if(checkCollision(yawObj.position)) { if(velocity.y < 0) canJump = true; yawObj.position.y = oldPos.y; velocity.y = 0; }
 
-        yawObj.position.x += moveVec.x;
-        if(checkCollision(yawObj.position)) yawObj.position.x = oldPos.x;
-        yawObj.position.z += moveVec.z;
-        if(checkCollision(yawObj.position)) yawObj.position.z = oldPos.z;
+        // Логіка свинки
+        pigs.forEach(pig => {
+            pig.timer--;
+            if(pig.timer <= 0) {
+                pig.dir.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
+                pig.timer = 100 + Math.random()*200;
+            }
+            let pOld = pig.mesh.position.clone();
+            pig.mesh.position.add(pig.dir.clone().multiplyScalar(0.03));
+            pig.mesh.rotation.y = Math.atan2(pig.dir.x, pig.dir.z);
 
-        canJump = false;
-        yawObj.position.y += velocity.y;
-        if(checkCollision(yawObj.position)) {
-            if(velocity.y < 0) canJump = true;
-            yawObj.position.y = oldPos.y;
-            velocity.y = 0;
-        }
+            // Перевірка, щоб не впала і не зайшла у воду
+            let isSafe = false;
+            for(let obj of objects) {
+                // Перевірка чи є під ногами блок і чи це не вода
+                if(Math.abs(pig.mesh.position.x - obj.position.x) < 0.6 && Math.abs(pig.mesh.position.z - obj.position.z) < 0.6 && obj.position.y === 0) {
+                    if(obj.userData.type !== 5) isSafe = true;
+                }
+            }
+            
+            // Якщо попереду небезпека або стіна — розвертаємось
+            if(!isSafe || checkCollision(pig.mesh.position, 0.4, 0.6, true) || pig.mesh.position.x < 1 || pig.mesh.position.x > mapSize-1) {
+                pig.mesh.position.copy(pOld);
+                pig.timer = 0;
+            }
+        });
+
         renderer.render(scene, camera);
     }
 </script>
