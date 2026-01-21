@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Mobile – FULL FIX</title>
+<title>Minecraft Mobile – FINAL FIX</title>
 
 <style>
 body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none}
@@ -90,6 +90,12 @@ let selected=1;
 
 const SIZE=50;
 const HEIGHT=1.7;
+
+/* ===== FULLSCREEN ===== */
+document.addEventListener("touchstart",()=>{
+if(document.fullscreenElement) return;
+document.documentElement.requestFullscreen?.();
+},{once:true});
 
 /* ===== TEXTURES ===== */
 function makeTex(color){
@@ -235,9 +241,16 @@ function loop(){
 requestAnimationFrame(loop);
 vel.y-=.01;
 
+/* === MOVE RELATIVE TO CAMERA === */
+const dir=new THREE.Vector3(
+move.r-move.l,
+0,
+move.b-move.f
+);
+dir.applyQuaternion(yaw.quaternion).normalize().multiplyScalar(.12);
+
 const old=yaw.position.clone();
-yaw.position.x+=(move.r-move.l)*.12;
-yaw.position.z+=(move.b-move.f)*.12;
+yaw.position.add(dir);
 if(collide(yaw.position)) yaw.position.copy(old);
 
 yaw.position.y+=vel.y;
@@ -252,6 +265,7 @@ renderer.render(scene,camera);
 </script>
 </body>
 </html>
+
 
 
 
