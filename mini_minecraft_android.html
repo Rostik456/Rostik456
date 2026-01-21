@@ -3,31 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft BIG World Fix</title>
+<title>Minecraft Pro Edition</title>
 <style>
 body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
 canvas{width:100vw;height:100vh;display:block}
 #ui{position:absolute;inset:0;pointer-events:none;z-index:10}
-.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:60px;height:60px}
-#u{bottom:150px;left:80px} #d{bottom:30px;left:80px} #l{bottom:90px;left:15px} #r{bottom:90px;left:145px}
-.act{position:absolute;width:75px;height:75px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
-#jmp{bottom:30px;right:120px} #put{bottom:115px;right:30px;background:rgba(76,175,80,.8)} #del{bottom:30px;right:30px;background:rgba(244,67,54,.8)}
-#inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:8px;border-radius:10px;pointer-events:auto}
-.slot{width:35px;height:35px;border:2px solid #555}
+.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:55px;height:55px}
+#u{bottom:140px;left:75px} #d{bottom:20px;left:75px} #l{bottom:80px;left:15px} #r{bottom:80px;left:135px}
+.act{position:absolute;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
+#jmp{bottom:20px;right:105px} #put{bottom:100px;right:20px;background:rgba(76,175,80,.8)} #del{bottom:20px;right:20px;background:rgba(244,67,54,.8)}
+#inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:6px;border-radius:8px;pointer-events:auto}
+.slot{width:35px;height:35px;border:2px solid #555;background-size:cover}
 .slot.active{border-color:#fff;box-shadow:0 0 10px #fff}
 </style>
 </head>
 <body>
 <div id="ui">
     <div id="inv">
-        <div class="slot active" onclick="sel(1,event)" style="background:#5d8233"></div>
-        <div class="slot" onclick="sel(4,event)" style="background:#6d4c41"></div>
-        <div class="slot" onclick="sel(3,event)" style="background:#808080"></div>
-        <div class="slot" onclick="sel(5,event)" style="background:#1e88e5"></div>
+        <div class="slot active" id="s1" onclick="sel(1,event)"></div>
+        <div class="slot" id="s2" onclick="sel(2,event)"></div>
+        <div class="slot" id="s3" onclick="sel(3,event)"></div>
+        <div class="slot" id="s4" onclick="sel(4,event)"></div>
     </div>
     <div class="btn" id="u">▲</div><div class="btn" id="d">▼</div>
     <div class="btn" id="l">◀</div><div class="btn" id="r">▶</div>
-    <button class="act" id="jmp">JUMP</button>
+    <button class="act" id="jmp">JMP</button>
     <button class="act" id="put">PUT</button>
     <button class="act" id="del">DEL</button>
 </div>
@@ -41,27 +41,47 @@ import * as THREE from "three";
 
 let scene, camera, renderer, yaw, pitch, ray;
 let move = {f:0, b:0, l:0, r:0}, vel = 0, canJ = false, blocks = [], selected = 1;
+const texs = {};
+
+function mkTex(c1, c2, noise=0.2) {
+    const can = document.createElement('canvas'); can.width = 16; can.height = 16;
+    const ctx = can.getContext('2d');
+    ctx.fillStyle = c1; ctx.fillRect(0,0,16,16);
+    ctx.fillStyle = c2;
+    for(let i=0; i<32; i++) ctx.fillRect(Math.random()*16, Math.random()*16, 1, 1);
+    const t = new THREE.CanvasTexture(can); t.magFilter = THREE.NearestFilter; return t;
+}
 
 init();
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+    scene.fog = new THREE.Fog(0x87ceeb, 15, 60);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    texs[1] = mkTex('#5d8233', '#4a6929'); // трава
+    texs[2] = mkTex('#795548', '#5d4037'); // земля
+    texs[3] = mkTex('#808080', '#606060'); // камінь
+    texs[4] = mkTex('#6d4c41', '#4e342e'); // дерево
+    texs[6] = mkTex('#2e7d32', '#1b5e20'); // листя
+    texs[7] = mkTex('#202020', '#000000'); // бедрок
+
+    document.getElementById('s1').style.backgroundImage = `url(${texs[1].image.toDataURL()})`;
+    document.getElementById('s2').style.backgroundImage = `url(${texs[2].image.toDataURL()})`;
+    document.getElementById('s3').style.backgroundImage = `url(${texs[3].image.toDataURL()})`;
+    document.getElementById('s4').style.backgroundImage = `url(${texs[4].image.toDataURL()})`;
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
     pitch = new THREE.Object3D(); pitch.add(camera);
     yaw = new THREE.Object3D(); yaw.add(pitch);
-    yaw.position.set(20, 5, 20); scene.add(yaw);
+    yaw.position.set(15, 6, 15); scene.add(yaw);
 
     renderer = new THREE.WebGLRenderer({antialias: false});
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-    sun.position.set(10, 20, 10); scene.add(sun);
-
+    scene.add(new THREE.AmbientLight(0xffffff, 1.4));
     ray = new THREE.Raycaster();
+
     createWorld();
 
     const b = (id, k) => {
@@ -75,60 +95,47 @@ function init() {
     document.getElementById("put").onpointerdown = () => interact(true);
     document.getElementById("del").onpointerdown = () => interact(false);
 
-    let lx, ly, firstTouch = true;
+    let lx, ly, isL = false;
     document.addEventListener("pointerdown", e => {
         if(e.target.closest(".btn") || e.target.closest(".act") || e.target.closest(".slot")) return;
-        lx = e.clientX; ly = e.clientY; firstTouch = false;
+        lx = e.clientX; ly = e.clientY; isL = true;
     });
-
     document.addEventListener("pointermove", e => {
-        if (firstTouch || e.pointerType !== 'touch' && e.buttons !== 1) return;
-        if(e.target.closest(".btn") || e.target.closest(".act")) return;
-
-        const dx = e.clientX - lx;
-        const dy = e.clientY - ly;
-        
-        yaw.rotation.y -= dx * 0.005;
-        pitch.rotation.x -= dy * 0.005;
+        if (!isL) return;
+        yaw.rotation.y -= (e.clientX - lx) * 0.006;
+        pitch.rotation.x -= (e.clientY - ly) * 0.006;
         pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
-
         lx = e.clientX; ly = e.clientY;
     });
-
-    document.addEventListener("pointerup", () => { firstTouch = true; });
-
+    document.addEventListener("pointerup", () => isL = false);
     loop();
 }
 
+function addB(x, y, z, t) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({map: texs[t]}));
+    m.position.set(x, y, z); m.userData.type = t;
+    scene.add(m); blocks.push(m);
+}
+
 function createWorld() {
-    const box = new THREE.BoxGeometry(1,1,1);
-    for(let x=0; x<40; x++) {
-        for(let z=0; z<40; z++) {
-            let type = 1; // трава
-            let y = 0;
-            
-            // ОЗЕРО в центрі
-            const dist = Math.sqrt((x-20)**2 + (z-20)**2);
-            if(dist < 5) {
-                type = 5; // вода
-                y = -0.5;
-            }
+    for(let x=0; x<30; x++) {
+        for(let z=0; z<30; z++) {
+            addB(x, 0, z, 1); // Трава
+            for(let y=-1; y>-3; y--) addB(x, y, z, 2); // Земля (2 шари)
+            for(let y=-3; y>-6; y--) addB(x, y, z, 3); // Камінь (3 шари)
+            addB(x, -6, z, 7); // Бедрок
 
-            const m = new THREE.Mesh(box, new THREE.MeshLambertMaterial({color: type===1?0x5d8233:0x1e88e5}));
-            m.position.set(x, y, z);
-            scene.add(m);
-            blocks.push(m);
-
-            // ДЕРЕВА
-            if(type === 1 && Math.random() > 0.98) {
-                for(let h=1; h<4; h++) {
-                    const trunk = new THREE.Mesh(box, new THREE.MeshLambertMaterial({color: 0x6d4c41}));
-                    trunk.position.set(x, h, z);
-                    scene.add(trunk); blocks.push(trunk);
+            // Дерева
+            if(Math.random() > 0.97 && x>2 && x<28 && z>2 && z<28) {
+                for(let h=1; h<=3; h++) addB(x, h, z, 4); // Стовбур
+                for(let lx=-1; lx<=1; lx++) {
+                    for(let lz=-1; lz<=1; lz++) {
+                        for(let ly=3; ly<=5; ly++) {
+                            if(lx===0 && lz===0 && ly===3) continue;
+                            addB(x+lx, ly, z+lz, 6);
+                        }
+                    }
                 }
-                const leaf = new THREE.Mesh(box, new THREE.MeshLambertMaterial({color: 0x2e7d32}));
-                leaf.position.set(x, 4, z);
-                scene.add(leaf); blocks.push(leaf);
             }
         }
     }
@@ -140,11 +147,9 @@ function interact(isP) {
     if(!h || h.distance > 5) return;
     if(isP) {
         const p = h.object.position.clone().add(h.face.normal);
-        const colors = {1:0x5d8233, 4:0x6d4c41, 3:0x808080, 5:0x1e88e5};
-        const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color: colors[selected]}));
-        m.position.copy(p); scene.add(m); blocks.push(m);
+        addB(p.x, p.y, p.z, selected);
     } else {
-        if(h.object.position.y > -0.1) {
+        if(h.object.userData.type !== 7) { // Не можна ламати бедрок
             scene.remove(h.object);
             blocks = blocks.filter(o => o !== h.object);
         }
@@ -161,7 +166,6 @@ function loop() {
     requestAnimationFrame(loop);
     vel -= 0.01;
     const oldP = yaw.position.clone();
-
     const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
     const rgt = new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion);
     fwd.y = 0; rgt.y = 0; fwd.normalize(); rgt.normalize();
@@ -171,7 +175,6 @@ function loop() {
     if(move.l) yaw.position.add(rgt.multiplyScalar(-0.12));
     if(move.r) yaw.position.add(rgt.multiplyScalar(0.12));
 
-    // Колізії
     let hit = false;
     for(let b of blocks) {
         if(Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1) hit = true;
@@ -184,13 +187,11 @@ function loop() {
         if(Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
     }
     if(floor) { yaw.position.y = oldP.y; vel = 0; canJ = true; } else { canJ = false; }
-
     renderer.render(scene, camera);
 }
 </script>
 </body>
 </html>
-
 
 
 
