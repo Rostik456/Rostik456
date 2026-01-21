@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft Mobile - Big World & Trees</title>
+    <title>Minecraft Mobile - Lake & Water</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
@@ -30,10 +30,10 @@
     <div id="crosshair"></div>
     <div id="inventory">
         <div class="slot active" onclick="window.setBlock(1)"><div class="block-preview" style="background: #5d8233;"></div></div>
-        <div class="slot" onclick="window.setBlock(2)"><div class="block-preview" style="background: #795548;"></div></div>
         <div class="slot" onclick="window.setBlock(3)"><div class="block-preview" style="background: #808080;"></div></div>
         <div class="slot" onclick="window.setBlock(4)"><div class="block-preview" style="background: #614126;"></div></div>
-        <div class="slot" onclick="window.setBlock(6)"><div class="block-preview" style="background: #2e7d32;"></div></div> </div>
+        <div class="slot" onclick="window.setBlock(6)"><div class="block-preview" style="background: #2e7d32;"></div></div>
+        <div class="slot" onclick="window.setBlock(5)"><div class="block-preview" style="background: #1e88e5; opacity: 0.7;"></div></div> </div>
     <div class="touch-btn" id="btn-up">W</div>
     <div class="touch-btn" id="btn-down">S</div>
     <div class="touch-btn" id="btn-left">A</div>
@@ -54,12 +54,12 @@
     let move = { f: 0, b: 0, l: 0, r: 0 };
     let velocity = new THREE.Vector3(0, 0, 0);
     let canJump = false;
+    let isInWater = false;
     let objects = [];
     let selectedBlock = 1;
     let lastTouchX = 0, lastTouchY = 0;
 
-    // Налаштування світу
-    const mapSize = 50; // Було 20, стало 50 (у 2.5 рази більше!)
+    const mapSize = 50;
     const playerRadius = 0.35;
     const playerHeight = 1.7;
 
@@ -70,14 +70,14 @@
     function init() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
-        scene.fog = new THREE.Fog(0x87ceeb, 20, 70); // Туман для продуктивності
+        scene.fog = new THREE.Fog(0x87ceeb, 25, 75);
         
         camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         pitchObj = new THREE.Object3D();
         pitchObj.add(camera);
         yawObj = new THREE.Object3D();
         yawObj.add(pitchObj);
-        yawObj.position.set(mapSize/2, 10, mapSize/2); // Спавн у центрі карти
+        yawObj.position.set(5, 5, 5); // Початок біля берега
         scene.add(yawObj);
 
         renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -91,10 +91,6 @@
         });
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-        sun.position.set(10, 20, 10);
-        scene.add(sun);
-
         raycaster = new THREE.Raycaster();
 
         generateWorld();
@@ -108,7 +104,10 @@
         setupBtn('btn-up', 'f'); setupBtn('btn-down', 'b');
         setupBtn('btn-left', 'l'); setupBtn('btn-right', 'r');
 
-        document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); if(canJump) { velocity.y = 0.22; canJump = false; }});
+        document.getElementById('btn-jump').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); e.stopPropagation(); 
+            if(canJump || isInWater) { velocity.y = isInWater ? 0.1 : 0.22; canJump = false; }
+        });
         document.getElementById('btn-build').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); interact(true); });
         document.getElementById('btn-destroy').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); interact(false); });
 
@@ -131,51 +130,69 @@
 
         window.setBlock = (id) => {
             selectedBlock = id;
-            document.querySelectorAll('.slot').forEach((s, i) => s.classList.toggle('active', i === id - 1));
+            document.querySelectorAll('.slot').forEach((s, i) => {
+                const isActive = (id === 1 && i === 0) || (id === 3 && i === 1) || (id === 4 && i === 2) || (id === 6 && i === 3) || (id === 5 && i === 4);
+                s.classList.toggle('active', isActive);
+            });
         };
 
         loop();
     }
 
     function addBlock(x, y, z, type) {
-        const material = new THREE.MeshLambertMaterial({ color: blockColors[type] });
+        const isWater = type === 5;
+        const material = new THREE.MeshLambertMaterial({ 
+            color: blockColors[type], 
+            transparent: isWater, 
+            opacity: isWater ? 0.6 : 1 
+        });
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), material);
         mesh.position.set(Math.floor(x), Math.floor(y), Math.floor(z));
+        mesh.userData.type = type;
         scene.add(mesh);
         objects.push(mesh);
     }
 
     function generateWorld() {
+        const center = mapSize / 2;
+        const lakeRadius = 8;
+
         for(let x=0; x<mapSize; x++) {
             for(let z=0; z<mapSize; z++) {
-                addBlock(x, 0, z, 1); // Трава
+                const dist = Math.sqrt(Math.pow(x - center, 2) + Math.pow(z - center, 2));
                 
-                // Шанс на дерево
-                if(Math.random() > 0.985 && x > 2 && x < mapSize-2 && z > 2 && z < mapSize-2) {
-                    const treeH = 3 + Math.floor(Math.random()*2);
-                    // Стовбур
-                    for(let h=1; h<=treeH; h++) addBlock(x, h, z, 4);
-                    // Листя
-                    for(let lx=-1; lx<=1; lx++) {
-                        for(let lz=-1; lz<=1; lz++) {
-                            for(let ly=0; ly<2; ly++) {
-                                if(lx===0 && lz===0 && ly===0) continue;
-                                addBlock(x+lx, treeH+ly, z+lz, 6);
-                            }
-                        }
+                if (dist < lakeRadius) {
+                    // Озеро
+                    addBlock(x, -1, z, 3); // Дно з каменю
+                    addBlock(x, 0, z, 5);  // Вода
+                } else {
+                    // Суша
+                    addBlock(x, 0, z, 1);
+                    // Випадкові дерева на суші
+                    if(Math.random() > 0.985 && dist > lakeRadius + 2) {
+                        const h = 3 + Math.floor(Math.random()*2);
+                        for(let i=1; i<=h; i++) addBlock(x, i, z, 4);
+                        for(let lx=-1; lx<=1; lx++) for(let lz=-1; lz<=1; lz++) addBlock(x+lx, h+1, z+lz, 6);
                     }
-                    addBlock(x, treeH+2, z, 6);
                 }
             }
         }
     }
 
     function checkCollision(pos) {
+        isInWater = false;
         for(let obj of objects) {
             let dx = Math.abs(pos.x - obj.position.x);
             let dy = Math.abs((pos.y - playerHeight/2) - obj.position.y);
             let dz = Math.abs(pos.z - obj.position.z);
-            if(dx < 0.5 + playerRadius && dz < 0.5 + playerRadius && dy < 0.5 + playerHeight/2) return true;
+            
+            if(dx < 0.5 + playerRadius && dz < 0.5 + playerRadius && dy < 0.5 + playerHeight/2) {
+                if(obj.userData.type === 5) {
+                    isInWater = true; // Ми у воді, але вона не блокує
+                    continue;
+                }
+                return true;
+            }
         }
         return false;
     }
@@ -188,7 +205,7 @@
                 const p = hits[0].object.position.clone().add(hits[0].face.normal);
                 addBlock(p.x, p.y, p.z, selectedBlock);
             } else {
-                if(hits[0].object.position.y === 0) return;
+                if(hits[0].object.position.y < 0) return;
                 scene.remove(hits[0].object);
                 objects = objects.filter(o => o !== hits[0].object);
             }
@@ -198,9 +215,15 @@
     function loop() {
         requestAnimationFrame(loop);
         let oldPos = yawObj.position.clone();
-        velocity.y -= 0.01;
+        
+        // Фізика води
+        const gravity = isInWater ? 0.002 : 0.01;
+        velocity.y -= gravity;
+        if(isInWater && velocity.y < -0.05) velocity.y = -0.05; // Повільне занурення
+
+        let speed = isInWater ? 0.07 : 0.14;
         let moveVec = new THREE.Vector3(move.r - move.l, 0, move.b - move.f);
-        moveVec.applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(0.14);
+        moveVec.applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(speed);
 
         yawObj.position.x += moveVec.x;
         if(checkCollision(yawObj.position)) yawObj.position.x = oldPos.x;
