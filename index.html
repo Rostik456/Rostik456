@@ -3,22 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft Mobile Final</title>
+    <title>Minecraft Mobile Rotation Fix</title>
     
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/606/606548.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="data:application/manifest+json,{'name':'MinecraftJS','short_name':'MCJS','start_url':'.','display':'standalone','orientation':'landscape','background_color':'#87ceeb','theme_color':'#87ceeb','icons':[{'src':'https://cdn-icons-png.flaticon.com/512/606/606548.png','sizes':'512x512','type':'image/png'}]}">
+    <link rel="manifest" href="data:application/manifest+json,{'name':'MinecraftJS','short_name':'MCJS','start_url':'.','display':'standalone','background_color':'#87ceeb','theme_color':'#87ceeb','icons':[{'src':'https://cdn-icons-png.flaticon.com/512/606/606548.png','sizes':'512x512','type':'image/png'}]}">
 
     <style>
         body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; font-family: sans-serif; user-select: none; }
-        canvas { display: block; }
+        canvas { display: block; width: 100vw; height: 100vh; }
         
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
-        /* Кнопки керування (прозорі та зручні) */
+        /* Кнопки керування */
         .touch-btn { position: absolute; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
         
+        /* Адаптивні позиції для кнопок */
         #btn-up { bottom: 130px; left: 85px; width: 55px; height: 55px; }
         #btn-down { bottom: 20px; left: 85px; width: 55px; height: 55px; }
         #btn-left { bottom: 75px; left: 20px; width: 55px; height: 55px; }
@@ -32,18 +33,24 @@
         #hotbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; pointer-events: auto; }
         .slot { width: 35px; height: 35px; border: 2px solid #555; border-radius: 4px; }
         .active { border-color: white; box-shadow: 0 0 10px white; }
+
+        /* Попередження про поворот екрана */
+        #rotate-warning { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #fff; z-index: 9999; align-items: center; justify-content: center; text-align: center; }
+        @media screen and (orientation: portrait) {
+            #rotate-warning { display: flex; }
+        }
     </style>
 </head>
 <body>
 
+<div id="rotate-warning">Будь ласка, переверніть телефон горизонтально 🔄</div>
+
 <div id="ui-layer">
     <div id="crosshair"></div>
-    
     <div class="touch-btn" id="btn-up">W</div>
     <div class="touch-btn" id="btn-down">S</div>
     <div class="touch-btn" id="btn-left">A</div>
     <div class="touch-btn" id="btn-right">D</div>
-    
     <div class="touch-btn" id="btn-action">BUILD</div>
     <div class="touch-btn" id="btn-jump">JUMP</div>
 
@@ -86,33 +93,32 @@
         scene.add(yawObj);
 
         renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1.5 : 1);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
+
+        // --- ФУНКЦІЯ ПЕРЕВОРОТУ ЕКРАНА ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.5));
         raycaster = new THREE.Raycaster();
 
-        // Генерація початкового світу
+        // Світ
         for(let x=0; x<20; x++) {
             for(let z=0; z<20; z++) {
                 addBlock(x, 0, z, 1);
-                if(Math.random() > 0.98) {
-                    for(let i=1; i<4; i++) addBlock(x, i, z, 4);
-                }
             }
         }
 
-        // --- КЕРУВАННЯ З ФІКСОМ КАМЕРИ ---
-        
+        // Керування (з фіксом смикання)
         const setupBtn = (id, key) => {
             const el = document.getElementById(id);
-            el.addEventListener('touchstart', (e) => { 
-                e.preventDefault(); e.stopPropagation(); move[key] = 1; 
-            });
-            el.addEventListener('touchend', (e) => { 
-                e.preventDefault(); e.stopPropagation(); move[key] = 0; 
-            });
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); move[key] = 1; });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); move[key] = 0; });
         };
         setupBtn('btn-up', 'f'); setupBtn('btn-down', 'b');
         setupBtn('btn-left', 'l'); setupBtn('btn-right', 'r');
@@ -127,29 +133,22 @@
             interact(true);
         });
 
-        // Обертання камерою та ламання
         document.addEventListener('touchstart', (e) => {
             if (e.target.classList.contains('touch-btn') || e.target.classList.contains('slot')) return;
-            
             lastTouchX = e.touches[0].clientX;
             lastTouchY = e.touches[0].clientY;
-            
-            // Швидкий тап = ламання
             let timer = setTimeout(() => interact(false), 200);
             e.target.addEventListener('touchmove', () => clearTimeout(timer), {once: true});
         });
 
         document.addEventListener('touchmove', (e) => {
             if (e.target.classList.contains('touch-btn')) return;
-
             const touch = e.touches[0];
             const dx = touch.clientX - lastTouchX;
             const dy = touch.clientY - lastTouchY;
-
             yawObj.rotation.y -= dx * 0.005;
             pitchObj.rotation.x -= dy * 0.005;
             pitchObj.rotation.x = Math.max(-1.5, Math.min(1.5, pitchObj.rotation.x));
-
             lastTouchX = touch.clientX;
             lastTouchY = touch.clientY;
         }, { passive: false });
@@ -177,7 +176,6 @@
                 const p = hits[0].object.position.clone().add(hits[0].face.normal);
                 addBlock(p.x, p.y, p.z, selectedBlock);
             } else {
-                if (hits[0].object.position.y === 0 && hits[0].object.position.x === 10) return; // Не ламати спавн
                 scene.remove(hits[0].object);
                 objects = objects.filter(o => o !== hits[0].object);
             }
@@ -186,36 +184,20 @@
 
     function loop() {
         requestAnimationFrame(loop);
-        
-        let oldPos = yawObj.position.clone();
-        velY -= 0.01; // Гравітація
-
+        velY -= 0.01;
         let dir = new THREE.Vector3(move.r - move.l, 0, move.b - move.f);
         dir.applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(0.12);
-        
         yawObj.position.x += dir.x;
         yawObj.position.z += dir.z;
         yawObj.position.y += velY;
 
-        // Проста колізія з підлогою
         canJump = false;
-        for(let obj of objects) {
-            if(Math.abs(yawObj.position.x - obj.position.x) < 0.7 && 
-               Math.abs(yawObj.position.z - obj.position.z) < 0.7 && 
-               yawObj.position.y - 1.6 < obj.position.y + 0.5 && 
-               yawObj.position.y - 1.6 > obj.position.y - 0.5) {
-                yawObj.position.y = obj.position.y + 2.1;
-                velY = 0;
-                canJump = true;
-            }
+        if(yawObj.position.y < 2.1) {
+            yawObj.position.y = 2.1;
+            velY = 0;
+            canJump = true;
         }
-
         renderer.render(scene, camera);
-    }
-
-    // Реєстрація для PWA
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('data:text/javascript,self.addEventListener("fetch", (e) => e.respondWith(fetch(e.request)))');
     }
 </script>
 </body>
