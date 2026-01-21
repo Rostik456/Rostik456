@@ -1,115 +1,141 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-<meta charset="UTF-8">
-<title>Mini Minecraft – Stable</title>
-<style>
-body { margin:0; overflow:hidden; background:black; }
-#crosshair{
- position:fixed;
- left:50%; top:50%;
- transform:translate(-50%,-50%);
- color:white; font-size:18px;
- pointer-events:none;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MC Mobile Fix</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* Кнопки керування */
+        .touch-btn { position: absolute; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 10px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; user-select: none; }
+        #btn-up { bottom: 120px; left: 70px; width: 60px; height: 60px; }
+        #btn-down { bottom: 20px; left: 70px; width: 60px; height: 60px; }
+        #btn-left { bottom: 70px; left: 20px; width: 60px; height: 60px; }
+        #btn-right { bottom: 70px; left: 120px; width: 60px; height: 60px; }
+        #btn-jump { bottom: 70px; right: 30px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.4); }
+        
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 1px solid white; transform: translate(-50%, -50%); }
+    </style>
 </head>
 <body>
 
-<div id="crosshair">+</div>
+<div id="ui-layer">
+    <div id="crosshair"></div>
+    <div class="touch-btn" id="btn-up">W</div>
+    <div class="touch-btn" id="btn-down">S</div>
+    <div class="touch-btn" id="btn-left">A</div>
+    <div class="touch-btn" id="btn-right">D</div>
+    <div class="touch-btn" id="btn-jump">JUMP</div>
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script>
+<script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
 
-/* ===== SCENE ===== */
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb);
+<script type="module">
+    import * as THREE from 'three';
 
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
-camera.position.set(0, 2, 5);
-camera.rotation.order = "YXZ";
+    let scene, camera, renderer, yawObj, pitchObj;
+    let move = { f: 0, b: 0, l: 0, r: 0 };
+    let velY = 0, canJump = false;
+    let objects = [];
 
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(innerWidth, innerHeight);
-document.body.appendChild(renderer.domElement);
+    // Для обертання камерою на тачскріні
+    let lastTouchX = 0, lastTouchY = 0;
 
-/* ===== LIGHT ===== */
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-sun.position.set(10, 20, 10);
-scene.add(sun);
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        pitchObj = new THREE.Object3D();
+        pitchObj.add(camera);
+        yawObj = new THREE.Object3D();
+        yawObj.add(pitchObj);
+        yawObj.position.set(10, 10, 10);
+        scene.add(yawObj);
 
-/* ===== BLOCKS ===== */
-const blocks = [];
-const geo = new THREE.BoxGeometry(1,1,1);
-const mat = new THREE.MeshLambertMaterial({color:0x55aa55});
+        renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-for(let x=-10;x<=10;x++){
- for(let z=-10;z<=10;z++){
-  const b = new THREE.Mesh(geo, mat);
-  b.position.set(x,0,z);
-  scene.add(b);
-  blocks.push(b);
- }
-}
+        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
 
-/* ===== LOOK ===== */
-let yaw=0, pitch=0;
-document.body.onclick = ()=>document.body.requestPointerLock();
-document.addEventListener("mousemove",e=>{
- if(document.pointerLockElement!==document.body) return;
- yaw -= e.movementX*0.002;
- pitch -= e.movementY*0.002;
- pitch = Math.max(-1.5, Math.min(1.5, pitch));
- camera.rotation.set(pitch,yaw,0);
-});
+        // Генерація підлоги
+        for(let x=0; x<20; x++) {
+            for(let z=0; z<20; z++) {
+                const cube = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color: 0x5d8233}));
+                cube.position.set(x, 0, z);
+                scene.add(cube);
+                objects.push(cube);
+            }
+        }
 
-/* ===== MOVE ===== */
-const keys = {};
-onkeydown = e=>keys[e.code]=true;
-onkeyup   = e=>keys[e.code]=false;
+        // КЕРУВАННЯ ДЛЯ ТЕЛЕФОНУ
+        const setupBtn = (id, key, val) => {
+            const el = document.getElementById(id);
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); move[key] = 1; });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); move[key] = 0; });
+        };
+        setupBtn('btn-up', 'f'); setupBtn('btn-down', 'b');
+        setupBtn('btn-left', 'l'); setupBtn('btn-right', 'r');
+        
+        document.getElementById('btn-jump').addEventListener('touchstart', () => {
+            if(canJump) { velY = 0.2; canJump = false; }
+        });
 
-let yVel = 0;
-let onGround = false;
+        // ПОВОРOT КАМЕРИ ПАЛЬЦЕМ
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches[0].clientX > window.innerWidth / 2) {
+                lastTouchX = e.touches[0].clientX;
+                lastTouchY = e.touches[0].clientY;
+            }
+        });
 
-function animate(){
- requestAnimationFrame(animate);
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches[0].clientX > window.innerWidth / 2) {
+                const touch = e.touches[0];
+                const movementX = touch.clientX - lastTouchX;
+                const movementY = touch.clientY - lastTouchY;
+                
+                yawObj.rotation.y -= movementX * 0.005;
+                pitchObj.rotation.x -= movementY * 0.005;
+                pitchObj.rotation.x = Math.max(-1.5, Math.min(1.5, pitchObj.rotation.x));
+                
+                lastTouchX = touch.clientX;
+                lastTouchY = touch.clientY;
+            }
+        });
 
- const speed = 0.1;
- const dir = new THREE.Vector3();
- camera.getWorldDirection(dir);
- dir.y=0; dir.normalize();
- const side = new THREE.Vector3(dir.z,0,-dir.x);
+        loop();
+    }
 
- if(keys.KeyW) camera.position.addScaledVector(dir, speed);
- if(keys.KeyS) camera.position.addScaledVector(dir,-speed);
- if(keys.KeyA) camera.position.addScaledVector(side,-speed);
- if(keys.KeyD) camera.position.addScaledVector(side, speed);
+    function loop() {
+        requestAnimationFrame(loop);
+        
+        let oldPos = yawObj.position.clone();
+        velY -= 0.01;
+        
+        let dir = new THREE.Vector3(move.r - move.l, 0, move.b - move.f);
+        dir.applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(0.1);
+        
+        yawObj.position.x += dir.x;
+        yawObj.position.z += dir.z;
+        yawObj.position.y += velY;
 
- yVel -= 0.01;
- camera.position.y += yVel;
+        // Спрощена колізія підлоги
+        if(yawObj.position.y < 2) {
+            yawObj.position.y = 2;
+            velY = 0;
+            canJump = true;
+        }
 
- if(camera.position.y < 2){
-  camera.position.y = 2;
-  yVel = 0;
-  onGround = true;
- }
+        renderer.render(scene, camera);
+    }
 
- if(keys.Space && onGround){
-  yVel = 0.25;
-  onGround = false;
- }
-
- renderer.render(scene, camera);
-}
-animate();
-
-onresize = ()=>{
- camera.aspect = innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth, innerHeight);
-};
-
+    init();
 </script>
 </body>
 </html>
