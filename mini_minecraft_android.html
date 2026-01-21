@@ -3,22 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Stable Final</title>
+<title>Minecraft Fullscreen Fixed</title>
 <style>
-body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
+body{margin:0;overflow:hidden;background:#000;touch-action:none;font-family:sans-serif}
 canvas{width:100%;height:100%;display:block}
-#crosshair{position:absolute;top:50%;left:50%;width:18px;height:18px;transform:translate(-50%,-50%);pointer-events:none;z-index:20;border:2px solid rgba(255,255,255,0.5);border-radius:50%}
+#crosshair{position:absolute;top:50%;left:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none;z-index:20}
+#crosshair::after, #crosshair::before{content:'';position:absolute;background:#fff;opacity:0.8}
+#crosshair::before{top:9px;left:0;width:20px;height:2px}
+#crosshair::after{top:0;left:9px;width:2px;height:20px}
 #ui{position:absolute;inset:0;pointer-events:none;z-index:10}
-.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:12px;position:absolute;width:60px;height:60px;user-select:none;font-size:24px}
+.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:60px;height:60px;user-select:none}
 #u{bottom:140px;left:80px} #d{bottom:20px;left:80px} #l{bottom:80px;left:10px} #r{bottom:80px;left:150px}
 .act{position:absolute;width:75px;height:75px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
 #jmp{bottom:20px;right:110px} #put{bottom:110px;right:25px;background:rgba(76,175,80,.8)} #del{bottom:20px;right:25px;background:rgba(244,67,54,.8)}
-#inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(0,0,0,.7);padding:8px;border-radius:12px;pointer-events:auto;border:1px solid #555}
-.slot{width:45px;height:45px;border:3px solid #444;background-size:cover;image-rendering:pixelated;border-radius:4px}
-.slot.active{border-color:#fff;box-shadow:0 0 15px #fff}
+#inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:6px;border-radius:8px;pointer-events:auto}
+.slot{width:45px;height:45px;border:3px solid #555;background-size:cover;image-rendering:pixelated}
+.slot.active{border-color:#fff;box-shadow:0 0-10px #fff}
+#fs-btn{position:absolute;top:10px;right:10px;padding:10px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid #fff;border-radius:5px;pointer-events:auto;font-size:12px}
 </style>
 </head>
 <body>
+
+<div id="fs-btn" onclick="toggleFS()">FULLSCREEN</div>
 <div id="crosshair"></div>
 <div id="ui">
     <div id="inv">
@@ -46,106 +52,107 @@ let scene, camera, renderer, yaw, pitch, ray;
 let move = {f:0, b:0, l:0, r:0}, vel = 0, canJ = false, blocks = [], selected = 1;
 const texs = {};
 
-// Створення текстур з перевіркою завантаження в інвентар
+window.toggleFS = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(e => console.log(e));
+    } else {
+        document.exitFullscreen();
+    }
+};
+
 function mkTex(c1, c2, pattern='noise') {
     const can = document.createElement('canvas'); can.width = 16; can.height = 16;
     const ctx = can.getContext('2d');
     ctx.fillStyle = c1; ctx.fillRect(0,0,16,16);
     ctx.fillStyle = c2;
-    if(pattern === 'planks') { ctx.fillRect(0, 7, 16, 2); ctx.fillRect(7, 0, 2, 7); }
-    else if (pattern === 'brick') { for (let y = 0; y < 16; y += 4) ctx.fillRect(0, y, 16, 1); for (let x = 0; x < 16; x += 8) ctx.fillRect(x, 0, 1, 16); }
-    else if (pattern === 'sapling') { ctx.fillStyle='#795548'; ctx.fillRect(7, 8, 2, 8); ctx.fillStyle='#2e7d32'; ctx.fillRect(4, 4, 8, 4); }
-    else { for(let i=0; i<32; i++) ctx.fillRect(Math.random()*16, Math.random()*16, 1, 1); }
+    if(pattern==='planks'){ctx.fillRect(0,7,16,2);ctx.fillRect(7,0,2,7)}
+    else if(pattern==='brick'){for(let y=0;y<16;y+=4)ctx.fillRect(0,y,16,1);for(let x=0;x<16;x+=8)ctx.fillRect(x,0,1,16)}
+    else if(pattern==='sapling'){ctx.fillStyle='#795548';ctx.fillRect(7,8,2,8);ctx.fillStyle='#2e7d32';ctx.fillRect(4,4,8,4)}
+    else {for(let i=0;i<32;i++)ctx.fillRect(Math.random()*16,Math.random()*16,1,1)}
     const t = new THREE.CanvasTexture(can); t.magFilter = THREE.NearestFilter; return t;
-}
-
-function addB(x, y, z, t) {
-    const m = new THREE.Mesh(
-        new THREE.BoxGeometry(1,1,1), 
-        new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1})
-    );
-    m.position.set(x, y, z); m.userData.type = t;
-    scene.add(m); blocks.push(m);
 }
 
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    
-    // Текстури
-    texs[1] = mkTex('#5d8233', '#4a6929'); // Трава
-    texs[3] = mkTex('#808080', '#606060'); // Камінь
-    texs[4] = mkTex('#6d4c41', '#4e342e'); // Стовбур
-    texs[6] = mkTex('#2e7d32', '#1b5e20'); // Листя
-    texs[7] = mkTex('#202020', '#000000'); // Бедрок
-    texs[8] = mkTex('#bc986a', '#967342', 'planks'); // Дошки
-    texs[9] = mkTex('#b53f3f', '#8c2f2f', 'brick'); // Цегла
-    texs[10] = mkTex('#87ceeb', '#2e7d32', 'sapling'); // Саджанець
+    scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
 
-    // Виставляємо іконки
-    [1, 8, 9, 3, 10].forEach(id => {
-        document.getElementById('s' + id).style.backgroundImage = `url(${texs[id].image.toDataURL()})`;
-    });
+    texs[1]=mkTex('#5d8233','#4a6929'); texs[2]=mkTex('#795548','#5d4037');
+    texs[3]=mkTex('#808080','#606060'); texs[4]=mkTex('#6d4c41','#4e342e');
+    texs[5]=mkTex('#1e88e5','#1565c0'); texs[6]=mkTex('#2e7d32','#1b5e20');
+    texs[7]=mkTex('#202020','#000000'); texs[8]=mkTex('#bc986a','#967342','planks');
+    texs[9]=mkTex('#b53f3f','#8c2f2f','brick'); texs[10]=mkTex('#87ceeb','#2e7d32','sapling');
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
+    [1, 8, 9, 3, 10].forEach(id => document.getElementById('s'+id).style.backgroundImage=`url(${texs[id].image.toDataURL()})`);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     pitch = new THREE.Object3D(); pitch.add(camera);
     yaw = new THREE.Object3D(); yaw.add(pitch);
     scene.add(yaw);
 
     renderer = new THREE.WebGLRenderer({antialias: false});
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
-    // Світло
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(5, 15, 5);
-    scene.add(sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(10, 20, 10); scene.add(sun);
 
     ray = new THREE.Raycaster();
-
-    // Завжди генеруємо новий світ, якщо пам'ять порожня
-    genWorld();
-
+    genMap();
     setupControls();
+    
+    window.addEventListener('resize', onResize);
     loop();
 }
 
-function genWorld() {
-    yaw.position.set(10, 5, 10);
-    // Маленька карта 20x20 для гарантованого завантаження
-    for(let x=0; x<20; x++) {
-        for(let z=0; z<20; z++) {
-            addB(x, 0, z, 1); // Трава
-            addB(x, -1, z, 7); // Бедрок нижче
-        }
+function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function addB(x, y, z, t) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1}));
+    m.position.set(x, y, z); m.userData.type = t;
+    scene.add(m); blocks.push(m);
+}
+
+function genMap() {
+    yaw.position.set(20, 8, 20);
+    for(let x=0; x<40; x++) for(let z=0; z<40; z++) {
+        const d = Math.sqrt((x-20)**2 + (z-20)**2);
+        if(d < 7) { addB(x, 0, z, 5); addB(x, -1, z, 2); } // Озеро
+        else { addB(x, 0, z, 1); addB(x, -1, z, 2); } // Трава
+        addB(x, -2, z, 7); // Бедрок
+    }
+    // Занедбаний будинок
+    for(let y=1; y<4; y++) for(let x=10; x<15; x++) for(let z=10; z<15; z++) {
+        if((x===10||x===14||z===10||z===14) && Math.random()>0.2) addB(x,y,z,9);
     }
 }
 
 function setupControls() {
-    const press = (id, k, v) => {
+    const b = (id, k) => {
         const el = document.getElementById(id);
-        el.onpointerdown = (e) => { e.stopPropagation(); move[k] = v; };
+        el.onpointerdown = (e) => { e.stopPropagation(); move[k] = 1; };
         el.onpointerup = () => move[k] = 0;
     };
-    press("u","f",1); press("d","b",1); press("l","l",1); press("r","r",1);
-
-    document.getElementById("jmp").onpointerdown = (e) => { e.stopPropagation(); if(canJ) vel = 0.22; };
-    document.getElementById("put").onpointerdown = (e) => { e.stopPropagation(); interact(true); };
-    document.getElementById("del").onpointerdown = (e) => { e.stopPropagation(); interact(false); };
+    b("u","f"); b("d","b"); b("l","l"); b("r","r");
+    document.getElementById("jmp").onpointerdown = e => { e.stopPropagation(); if(canJ) vel=0.22; };
+    document.getElementById("put").onpointerdown = e => { e.stopPropagation(); interact(true); };
+    document.getElementById("del").onpointerdown = e => { e.stopPropagation(); interact(false); };
 
     let lx, ly, tid = null;
-    renderer.domElement.onpointerdown = e => { tid = e.pointerId; lx = e.clientX; ly = e.clientY; };
+    renderer.domElement.onpointerdown = e => { tid=e.pointerId; lx=e.clientX; ly=e.clientY; };
     renderer.domElement.onpointermove = e => {
-        if (e.pointerId === tid) {
-            yaw.rotation.y -= (e.clientX - lx) * 0.007;
-            pitch.rotation.x -= (e.clientY - ly) * 0.007;
+        if(e.pointerId === tid) {
+            yaw.rotation.y -= (e.clientX - lx) * 0.005;
+            pitch.rotation.x -= (e.clientY - ly) * 0.005;
             pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
             lx = e.clientX; ly = e.clientY;
         }
     };
-    renderer.domElement.onpointerup = () => tid = null;
+    renderer.domElement.onpointerup = () => tid=null;
 }
 
 function interact(isP) {
@@ -154,14 +161,12 @@ function interact(isP) {
     if(!h || h.distance > 5) return;
     const p = h.object.position.clone().add(h.face.normal);
     if(isP) {
-        if(selected === 10) { // Дерево
-            for(let h=0; h<3; h++) addB(p.x, p.y+h, p.z, 4);
+        if(selected === 10) {
+            for(let i=0; i<3; i++) addB(p.x, p.y+i, p.z, 4);
             for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) addB(p.x+i, p.y+3, p.z+j, 6);
         } else addB(p.x, p.y, p.z, selected);
-    } else {
-        if(h.object.userData.type !== 7) {
-            scene.remove(h.object); blocks = blocks.filter(o => o !== h.object);
-        }
+    } else if(h.object.userData.type !== 7) {
+        scene.remove(h.object); blocks = blocks.filter(o => o !== h.object);
     }
 }
 
@@ -177,25 +182,19 @@ function loop() {
     const old = yaw.position.clone();
     const f = new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion).setY(0).normalize();
     const r = new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion).setY(0).normalize();
-    
     if(move.f) yaw.position.addScaledVector(f, 0.12);
     if(move.b) yaw.position.addScaledVector(f, -0.12);
     if(move.l) yaw.position.addScaledVector(r, -0.12);
     if(move.r) yaw.position.addScaledVector(r, 0.12);
 
     let hit = false;
-    for(let b of blocks) {
-        if(Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1.2) hit = true;
-    }
+    for(let b of blocks) if(b.userData.type!==5 && Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1.2) hit = true;
     if(hit) yaw.position.copy(old);
 
     yaw.position.y += vel;
     let floor = false;
-    for(let b of blocks) {
-        if(Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
-    }
+    for(let b of blocks) if(b.userData.type!==5 && Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
     if(floor) { yaw.position.y = old.y; vel = 0; canJ = true; } else canJ = false;
-    
     renderer.render(scene, camera);
 }
 init();
