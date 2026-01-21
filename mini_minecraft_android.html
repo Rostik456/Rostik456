@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Fullscreen Fixed</title>
+<title>Minecraft Trees & Physics Fix</title>
 <style>
-body{margin:0;overflow:hidden;background:#000;touch-action:none;font-family:sans-serif}
+body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
 canvas{width:100%;height:100%;display:block}
 #crosshair{position:absolute;top:50%;left:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none;z-index:20}
 #crosshair::after, #crosshair::before{content:'';position:absolute;background:#fff;opacity:0.8}
@@ -18,13 +18,11 @@ canvas{width:100%;height:100%;display:block}
 #jmp{bottom:20px;right:110px} #put{bottom:110px;right:25px;background:rgba(76,175,80,.8)} #del{bottom:20px;right:25px;background:rgba(244,67,54,.8)}
 #inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:6px;border-radius:8px;pointer-events:auto}
 .slot{width:45px;height:45px;border:3px solid #555;background-size:cover;image-rendering:pixelated}
-.slot.active{border-color:#fff;box-shadow:0 0-10px #fff}
-#fs-btn{position:absolute;top:10px;right:10px;padding:10px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid #fff;border-radius:5px;pointer-events:auto;font-size:12px}
+.slot.active{border-color:#fff;box-shadow:0 0 10px #fff}
 </style>
 </head>
 <body>
 
-<div id="fs-btn" onclick="toggleFS()">FULLSCREEN</div>
 <div id="crosshair"></div>
 <div id="ui">
     <div id="inv">
@@ -52,14 +50,6 @@ let scene, camera, renderer, yaw, pitch, ray;
 let move = {f:0, b:0, l:0, r:0}, vel = 0, canJ = false, blocks = [], selected = 1;
 const texs = {};
 
-window.toggleFS = () => {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(e => console.log(e));
-    } else {
-        document.exitFullscreen();
-    }
-};
-
 function mkTex(c1, c2, pattern='noise') {
     const can = document.createElement('canvas'); can.width = 16; can.height = 16;
     const ctx = can.getContext('2d');
@@ -70,6 +60,20 @@ function mkTex(c1, c2, pattern='noise') {
     else if(pattern==='sapling'){ctx.fillStyle='#795548';ctx.fillRect(7,8,2,8);ctx.fillStyle='#2e7d32';ctx.fillRect(4,4,8,4)}
     else {for(let i=0;i<32;i++)ctx.fillRect(Math.random()*16,Math.random()*16,1,1)}
     const t = new THREE.CanvasTexture(can); t.magFilter = THREE.NearestFilter; return t;
+}
+
+function addB(x, y, z, t) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1}));
+    m.position.set(x, y, z); m.userData.type = t;
+    scene.add(m); blocks.push(m);
+    return m;
+}
+
+function growTree(x, y, z) {
+    for(let i=0; i<4; i++) addB(x, y+i, z, 4); // Стовбур
+    for(let ix=-2; ix<=2; ix++) for(let iz=-2; iz<=2; iz++) for(let iy=3; iy<=5; iy++) {
+        if(Math.abs(ix)+Math.abs(iz)+Math.abs(iy-4) < 4) addB(x+ix, y+iy, z+iz, 6); // Листя
+    }
 }
 
 function init() {
@@ -92,115 +96,7 @@ function init() {
 
     renderer = new THREE.WebGLRenderer({antialias: false});
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(10, 20, 10); scene.add(sun);
-
-    ray = new THREE.Raycaster();
-    genMap();
-    setupControls();
-    
-    window.addEventListener('resize', onResize);
-    loop();
-}
-
-function onResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function addB(x, y, z, t) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1}));
-    m.position.set(x, y, z); m.userData.type = t;
-    scene.add(m); blocks.push(m);
-}
-
-function genMap() {
-    yaw.position.set(20, 8, 20);
-    for(let x=0; x<40; x++) for(let z=0; z<40; z++) {
-        const d = Math.sqrt((x-20)**2 + (z-20)**2);
-        if(d < 7) { addB(x, 0, z, 5); addB(x, -1, z, 2); } // Озеро
-        else { addB(x, 0, z, 1); addB(x, -1, z, 2); } // Трава
-        addB(x, -2, z, 7); // Бедрок
-    }
-    // Занедбаний будинок
-    for(let y=1; y<4; y++) for(let x=10; x<15; x++) for(let z=10; z<15; z++) {
-        if((x===10||x===14||z===10||z===14) && Math.random()>0.2) addB(x,y,z,9);
-    }
-}
-
-function setupControls() {
-    const b = (id, k) => {
-        const el = document.getElementById(id);
-        el.onpointerdown = (e) => { e.stopPropagation(); move[k] = 1; };
-        el.onpointerup = () => move[k] = 0;
-    };
-    b("u","f"); b("d","b"); b("l","l"); b("r","r");
-    document.getElementById("jmp").onpointerdown = e => { e.stopPropagation(); if(canJ) vel=0.22; };
-    document.getElementById("put").onpointerdown = e => { e.stopPropagation(); interact(true); };
-    document.getElementById("del").onpointerdown = e => { e.stopPropagation(); interact(false); };
-
-    let lx, ly, tid = null;
-    renderer.domElement.onpointerdown = e => { tid=e.pointerId; lx=e.clientX; ly=e.clientY; };
-    renderer.domElement.onpointermove = e => {
-        if(e.pointerId === tid) {
-            yaw.rotation.y -= (e.clientX - lx) * 0.005;
-            pitch.rotation.x -= (e.clientY - ly) * 0.005;
-            pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
-            lx = e.clientX; ly = e.clientY;
-        }
-    };
-    renderer.domElement.onpointerup = () => tid=null;
-}
-
-function interact(isP) {
-    ray.setFromCamera({x:0, y:0}, camera);
-    const h = ray.intersectObjects(blocks)[0];
-    if(!h || h.distance > 5) return;
-    const p = h.object.position.clone().add(h.face.normal);
-    if(isP) {
-        if(selected === 10) {
-            for(let i=0; i<3; i++) addB(p.x, p.y+i, p.z, 4);
-            for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) addB(p.x+i, p.y+3, p.z+j, 6);
-        } else addB(p.x, p.y, p.z, selected);
-    } else if(h.object.userData.type !== 7) {
-        scene.remove(h.object); blocks = blocks.filter(o => o !== h.object);
-    }
-}
-
-window.sel = (i, e) => {
-    selected = i;
-    document.querySelectorAll(".slot").forEach(s => s.classList.remove('active'));
-    e.currentTarget.classList.add('active');
-};
-
-function loop() {
-    requestAnimationFrame(loop);
-    vel -= 0.01;
-    const old = yaw.position.clone();
-    const f = new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion).setY(0).normalize();
-    const r = new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion).setY(0).normalize();
-    if(move.f) yaw.position.addScaledVector(f, 0.12);
-    if(move.b) yaw.position.addScaledVector(f, -0.12);
-    if(move.l) yaw.position.addScaledVector(r, -0.12);
-    if(move.r) yaw.position.addScaledVector(r, 0.12);
-
-    let hit = false;
-    for(let b of blocks) if(b.userData.type!==5 && Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1.2) hit = true;
-    if(hit) yaw.position.copy(old);
-
-    yaw.position.y += vel;
-    let floor = false;
-    for(let b of blocks) if(b.userData.type!==5 && Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
-    if(floor) { yaw.position.y = old.y; vel = 0; canJ = true; } else canJ = false;
-    renderer.render(scene, camera);
-}
-init();
-</script>
-</body>
-</html>
+    document.body.appendChild(
 
 
 
