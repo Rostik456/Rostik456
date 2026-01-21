@@ -3,46 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Mobile – FIXED</title>
+<title>Minecraft Mobile – World Fix</title>
 <style>
 body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
 canvas{width:100vw;height:100vh;display:block}
-#ui-layer{position:absolute;inset:0;pointer-events:none}
-.touch-btn,.action-btn{pointer-events:auto;color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.5);border-radius:8px}
-.touch-btn{position:absolute;width:60px;height:60px}
-#btn-up{bottom:140px;left:80px}
-#btn-down{bottom:20px;left:80px}
-#btn-left{bottom:80px;left:10px}
-#btn-right{bottom:80px;left:150px}
-.action-btn{position:absolute;width:70px;height:70px;border-radius:50%}
-#btn-jump{bottom:20px;right:110px}
-#btn-build{bottom:100px;right:20px;background:rgba(76,175,80,.7)}
-#btn-destroy{bottom:20px;right:20px;background:rgba(244,67,54,.7)}
-#inventory{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.5);padding:5px;border-radius:8px;pointer-events:auto}
-.slot{width:35px;height:35px;border:2px solid #444;background-size:cover}
-.slot.active{border-color:#fff;box-shadow:0 0 8px #fff}
-#crosshair{position:absolute;top:50%;left:50%;width:10px;height:10px;border:2px solid #fff;border-radius:50%;transform:translate(-50%,-50%)}
-#fs-btn{position:absolute;top:10px;right:10px;padding:10px;background:#000;color:#fff;pointer-events:auto;border-radius:5px;font-size:12px}
+#ui-layer{position:absolute;inset:0;pointer-events:none;z-index:10}
+.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;user-select:none}
+#u{bottom:150px;left:80px;width:60px;height:60px}
+#d{bottom:30px;left:80px;width:60px;height:60px}
+#l{bottom:90px;left:15px;width:60px;height:60px}
+#r{bottom:90px;left:145px;width:60px;height:60px}
+.act{position:absolute;width:75px;height:75px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
+#jmp{bottom:30px;right:120px}
+#put{bottom:115px;right:30px;background:rgba(76,175,80,.8)}
+#del{bottom:30px;right:30px;background:rgba(244,67,54,.8)}
+#inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:8px;border-radius:10px;pointer-events:auto}
+.slot{width:35px;height:35px;border:2px solid #555}
+.slot.active{border-color:#fff;box-shadow:0 0 10px #fff}
+#fs{position:absolute;top:10px;right:10px;padding:10px;background:#000;color:#fff;pointer-events:auto;border-radius:5px;font-size:12px}
 </style>
 </head>
 <body>
 <div id="ui-layer">
-<div id="fs-btn" onclick="document.documentElement.requestFullscreen()">FULLSCREEN</div>
-<div id="crosshair"></div>
-<div id="inventory">
-<div class="slot active" onclick="setBlock(1, event)" style="background-color:#5d8233"></div>
-<div class="slot" onclick="setBlock(2, event)" style="background-color:#795548"></div>
-<div class="slot" onclick="setBlock(3, event)" style="background-color:#808080"></div>
-<div class="slot" onclick="setBlock(4, event)" style="background-color:#6d4c41"></div>
-<div class="slot" onclick="setBlock(6, event)" style="background-color:#2e7d32"></div>
-</div>
-<div class="touch-btn" id="btn-up">▲</div>
-<div class="touch-btn" id="btn-down">▼</div>
-<div class="touch-btn" id="btn-left">◀</div>
-<div class="touch-btn" id="btn-right">▶</div>
-<div class="action-btn" id="btn-jump">JMP</div>
-<div class="action-btn" id="btn-build">PUT</div>
-<div class="action-btn" id="btn-destroy">DEL</div>
+    <div id="fs" onclick="document.documentElement.requestFullscreen()">FULLSCREEN</div>
+    <div id="inv">
+        <div class="slot active" onclick="sel(1,event)" style="background:#5d8233"></div>
+        <div class="slot" onclick="sel(2,event)" style="background:#795548"></div>
+        <div class="slot" onclick="sel(3,event)" style="background:#808080"></div>
+        <div class="slot" onclick="sel(4,event)" style="background:#6d4c41"></div>
+    </div>
+    <div class="btn" id="u">▲</div><div class="btn" id="d">▼</div>
+    <div class="btn" id="l">◀</div><div class="btn" id="r">▶</div>
+    <button class="act" id="jmp">JUMP</button>
+    <button class="act" id="put">PUT</button>
+    <button class="act" id="del">DEL</button>
 </div>
 
 <script type="importmap">
@@ -52,31 +46,132 @@ canvas{width:100vw;height:100vh;display:block}
 <script type="module">
 import * as THREE from "three";
 
-let scene, camera, renderer, yaw, pitch, raycaster;
+let scene, camera, renderer, yaw, pitch, ray;
 let move = {f:0, b:0, l:0, r:0};
-let vel = new THREE.Vector3();
-let canJump = false;
-let blocks = [];
-let selected = 1;
+let vel = 0, canJ = false, blocks = [], selected = 1;
 
-function makeTex(color) {
-    const c = document.createElement("canvas"); c.width = c.height = 16;
-    const g = c.getContext("2d");
-    g.fillStyle = color; g.fillRect(0,0,16,16);
-    for(let i=0; i<30; i++) { g.fillStyle = "rgba(0,0,0,0.15)"; g.fillRect(Math.random()*16, Math.random()*16, 1, 1); }
-    const t = new THREE.CanvasTexture(c);
-    t.magFilter = t.minFilter = THREE.NearestFilter;
-    return t;
-}
-
-const TEX = { 1:makeTex("#5d8233"), 2:makeTex("#795548"), 3:makeTex("#808080"), 4:makeTex("#6d4c41"), 5:makeTex("#1e88e5"), 6:makeTex("#2e7d32") };
-
-init(); loop();
-
+init();
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    camera = new THREE.
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
+    
+    pitch = new THREE.Object3D(); pitch.add(camera);
+    yaw = new THREE.Object3D(); yaw.add(pitch);
+    yaw.position.set(5, 5, 5); scene.add(yaw);
+
+    renderer = new THREE.WebGLRenderer({antialias: false});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+    ray = new THREE.Raycaster();
+
+    // СТВОРЕННЯ СВІТУ (ОПТИМІЗОВАНО)
+    const box = new THREE.BoxGeometry(1,1,1);
+    for(let x=0; x<20; x++) {
+        for(let z=0; z<20; z++) {
+            const mat = new THREE.MeshLambertMaterial({color: 0x5d8233});
+            const m = new THREE.Mesh(box, mat);
+            m.position.set(x, 0, z);
+            scene.add(m);
+            blocks.push(m);
+        }
+    }
+
+    // КЕРУВАННЯ
+    const b = (id, k) => {
+        const el = document.getElementById(id);
+        el.onpointerdown = (e) => { e.preventDefault(); move[k] = 1; };
+        el.onpointerup = (e) => { e.preventDefault(); move[k] = 0; };
+        el.onpointerleave = () => { move[k] = 0; };
+    };
+    b("u","f"); b("d","b"); b("l","l"); b("r","r");
+
+    document.getElementById("jmp").onpointerdown = () => { if(canJ) vel = 0.2; };
+    document.getElementById("put").onpointerdown = () => interact(true);
+    document.getElementById("del").onpointerdown = () => interact(false);
+
+    let lx, ly, isL = false;
+    document.onpointerdown = e => {
+        if(e.target.closest(".btn") || e.target.closest(".act") || e.target.closest(".slot")) return;
+        isL = true; lx = e.clientX; ly = e.clientY;
+    };
+    document.onpointermove = e => {
+        if(!isL) return;
+        yaw.rotation.y -= (e.clientX - lx) * 0.007;
+        pitch.rotation.x -= (e.clientY - ly) * 0.007;
+        pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
+        lx = e.clientX; ly = e.clientY;
+    };
+    document.onpointerup = () => isL = false;
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    loop();
+}
+
+function interact(isP) {
+    ray.setFromCamera({x:0, y:0}, camera);
+    const h = ray.intersectObjects(blocks)[0];
+    if(!h || h.distance > 5) return;
+    if(isP) {
+        const p = h.object.position.clone().add(h.face.normal);
+        const colors = {1:0x5d8233, 2:0x795548, 3:0x808080, 4:0x6d4c41};
+        const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color: colors[selected]}));
+        m.position.copy(p); scene.add(m); blocks.push(m);
+    } else {
+        if(h.object.position.y > 0) {
+            scene.remove(h.object);
+            blocks = blocks.filter(o => o !== h.object);
+        }
+    }
+}
+
+window.sel = (i, e) => {
+    selected = i;
+    document.querySelectorAll(".slot").forEach(s => s.classList.remove('active'));
+    e.target.classList.add('active');
+};
+
+function loop() {
+    requestAnimationFrame(loop);
+    vel -= 0.01;
+    const oldP = yaw.position.clone();
+
+    // РУХ ТУДИ, КУДИ ДИВИШСЯ
+    const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
+    const rgt = new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion);
+    fwd.y = 0; rgt.y = 0; fwd.normalize(); rgt.normalize();
+
+    if(move.f) yaw.position.add(fwd.multiplyScalar(0.12));
+    if(move.b) yaw.position.add(fwd.multiplyScalar(-0.12));
+    if(move.l) yaw.position.add(rgt.multiplyScalar(-0.12));
+    if(move.r) yaw.position.add(rgt.multiplyScalar(0.12));
+
+    // Колізія (спрощена)
+    let hit = false;
+    for(let b of blocks) {
+        if(Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1) hit = true;
+    }
+    if(hit) yaw.position.copy(oldP);
+
+    yaw.position.y += vel;
+    let floor = false;
+    for(let b of blocks) {
+        if(Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
+    }
+    if(floor) { yaw.position.y = oldP.y; vel = 0; canJ = true; } else { canJ = false; }
+
+    renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
 
 
 
