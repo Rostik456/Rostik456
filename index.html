@@ -3,24 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MC Mobile Fix</title>
+    <title>MC Mobile Build Fix</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; font-family: sans-serif; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
         /* Кнопки керування */
-        .touch-btn { position: absolute; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 10px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; user-select: none; }
-        #btn-up { bottom: 120px; left: 70px; width: 60px; height: 60px; }
-        #btn-down { bottom: 20px; left: 70px; width: 60px; height: 60px; }
-        #btn-left { bottom: 70px; left: 20px; width: 60px; height: 60px; }
-        #btn-right { bottom: 70px; left: 120px; width: 60px; height: 60px; }
-        #btn-jump { bottom: 70px; right: 30px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.4); }
+        .touch-btn { position: absolute; background: rgba(0,0,0,0.4); border: 2px solid #fff; border-radius: 10px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; user-select: none; font-size: 14px; }
+        #btn-up { bottom: 130px; left: 80px; width: 50px; height: 50px; }
+        #btn-down { bottom: 30px; left: 80px; width: 50px; height: 50px; }
+        #btn-left { bottom: 80px; left: 30px; width: 50px; height: 50px; }
+        #btn-right { bottom: 80px; left: 130px; width: 50px; height: 50px; }
         
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 1px solid white; transform: translate(-50%, -50%); }
+        /* Дії */
+        #btn-jump { bottom: 30px; right: 30px; width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.3); }
+        #btn-action { bottom: 120px; right: 30px; width: 70px; height: 70px; border-radius: 10px; background: #4caf50; font-weight: bold; }
+        
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid white; transform: translate(-50%, -50%); border-radius: 50%; }
+        #msg { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: white; background: rgba(0,0,0,0.5); padding: 5px; font-size: 12px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
+<div id="msg">Тап по блоку — зламати | Кнопка BUILD — поставити</div>
 <div id="ui-layer">
     <div id="crosshair"></div>
     <div class="touch-btn" id="btn-up">W</div>
@@ -28,6 +33,7 @@
     <div class="touch-btn" id="btn-left">A</div>
     <div class="touch-btn" id="btn-right">D</div>
     <div class="touch-btn" id="btn-jump">JUMP</div>
+    <div class="touch-btn" id="btn-action">BUILD</div>
 </div>
 
 <script type="importmap">
@@ -37,12 +43,10 @@
 <script type="module">
     import * as THREE from 'three';
 
-    let scene, camera, renderer, yawObj, pitchObj;
+    let scene, camera, renderer, yawObj, pitchObj, raycaster;
     let move = { f: 0, b: 0, l: 0, r: 0 };
     let velY = 0, canJump = false;
     let objects = [];
-
-    // Для обертання камерою на тачскріні
     let lastTouchX = 0, lastTouchY = 0;
 
     function init() {
@@ -54,7 +58,7 @@
         pitchObj.add(camera);
         yawObj = new THREE.Object3D();
         yawObj.add(pitchObj);
-        yawObj.position.set(10, 10, 10);
+        yawObj.position.set(10, 5, 10);
         scene.add(yawObj);
 
         renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -62,19 +66,17 @@
         document.body.appendChild(renderer.domElement);
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        raycaster = new THREE.Raycaster();
 
-        // Генерація підлоги
-        for(let x=0; x<20; x++) {
-            for(let z=0; z<20; z++) {
-                const cube = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color: 0x5d8233}));
-                cube.position.set(x, 0, z);
-                scene.add(cube);
-                objects.push(cube);
+        // Початковий світ
+        for(let x=0; x<15; x++) {
+            for(let z=0; z<15; z++) {
+                createBlock(x, 0, z, 0x5d8233);
             }
         }
 
-        // КЕРУВАННЯ ДЛЯ ТЕЛЕФОНУ
-        const setupBtn = (id, key, val) => {
+        // Керування рухом
+        const setupBtn = (id, key) => {
             const el = document.getElementById(id);
             el.addEventListener('touchstart', (e) => { e.preventDefault(); move[key] = 1; });
             el.addEventListener('touchend', (e) => { e.preventDefault(); move[key] = 0; });
@@ -82,28 +84,36 @@
         setupBtn('btn-up', 'f'); setupBtn('btn-down', 'b');
         setupBtn('btn-left', 'l'); setupBtn('btn-right', 'r');
         
-        document.getElementById('btn-jump').addEventListener('touchstart', () => {
+        document.getElementById('btn-jump').addEventListener('touchstart', (e) => {
+            e.preventDefault();
             if(canJump) { velY = 0.2; canJump = false; }
         });
 
-        // ПОВОРOT КАМЕРИ ПАЛЬЦЕМ
+        // КНОПКА BUILD (СТАВИТИ БЛОК)
+        document.getElementById('btn-action').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            interact(true); // true = ставити
+        });
+
+        // ТАП ПО ЕКРАНУ (ЛАМАТИ БЛОК АБО ОБЕРТАТИ)
         document.addEventListener('touchstart', (e) => {
-            if (e.touches[0].clientX > window.innerWidth / 2) {
+            if (e.target.tagName === 'CANVAS') {
                 lastTouchX = e.touches[0].clientX;
                 lastTouchY = e.touches[0].clientY;
+                
+                // Якщо це швидкий тап по центру — ламаємо блок
+                setTimeout(() => interact(false), 50); 
             }
         });
 
         document.addEventListener('touchmove', (e) => {
-            if (e.touches[0].clientX > window.innerWidth / 2) {
+            if (e.touches[0].clientX > window.innerWidth / 3) { // Обертання в правій частині
                 const touch = e.touches[0];
                 const movementX = touch.clientX - lastTouchX;
                 const movementY = touch.clientY - lastTouchY;
-                
-                yawObj.rotation.y -= movementX * 0.005;
-                pitchObj.rotation.x -= movementY * 0.005;
+                yawObj.rotation.y -= movementX * 0.007;
+                pitchObj.rotation.x -= movementY * 0.007;
                 pitchObj.rotation.x = Math.max(-1.5, Math.min(1.5, pitchObj.rotation.x));
-                
                 lastTouchX = touch.clientX;
                 lastTouchY = touch.clientY;
             }
@@ -112,9 +122,31 @@
         loop();
     }
 
+    function createBlock(x, y, z, color = 0x795548) {
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color: color}));
+        cube.position.set(Math.floor(x), Math.floor(y), Math.floor(z));
+        scene.add(cube);
+        objects.push(cube);
+    }
+
+    function interact(isPlace) {
+        raycaster.setFromCamera({x: 0, y: 0}, camera);
+        const hits = raycaster.intersectObjects(objects);
+        if (hits.length > 0 && hits[0].distance < 5) {
+            if (isPlace) {
+                // Ставимо блок на сторону, куди дивимось
+                const pos = hits[0].object.position.clone().add(hits[0].face.normal);
+                createBlock(pos.x, pos.y, pos.z);
+            } else {
+                // Видаляємо блок
+                scene.remove(hits[0].object);
+                objects = objects.filter(obj => obj !== hits[0].object);
+            }
+        }
+    }
+
     function loop() {
         requestAnimationFrame(loop);
-        
         let oldPos = yawObj.position.clone();
         velY -= 0.01;
         
@@ -125,7 +157,7 @@
         yawObj.position.z += dir.z;
         yawObj.position.y += velY;
 
-        // Спрощена колізія підлоги
+        // Колізія підлоги
         if(yawObj.position.y < 2) {
             yawObj.position.y = 2;
             velY = 0;
