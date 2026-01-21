@@ -3,25 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Lake & Planks Edition</title>
+<title>Minecraft Mobile Fullscreen</title>
 <style>
 body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
-canvas{width:100vw;height:100vh;display:block}
+canvas{width:100%;height:100%;display:block}
 #ui{position:absolute;inset:0;pointer-events:none;z-index:10}
-.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:55px;height:55px}
+/* Кнопки керування */
+.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:55px;height:55px;user-select:none}
 #u{bottom:140px;left:75px} #d{bottom:20px;left:75px} #l{bottom:80px;left:15px} #r{bottom:80px;left:135px}
+/* Кнопки дій */
 .act{position:absolute;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
 #jmp{bottom:20px;right:105px} #put{bottom:100px;right:20px;background:rgba(76,175,80,.8)} #del{bottom:20px;right:20px;background:rgba(244,67,54,.8)}
+/* Інвентар */
 #inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:6px;border-radius:8px;pointer-events:auto}
 .slot{width:35px;height:35px;border:2px solid #555;background-size:cover}
 .slot.active{border-color:#fff;box-shadow:0 0 10px #fff}
+/* Кнопка Fullscreen */
+#fs-toggle{position:absolute;top:10px;right:10px;padding:12px;background:rgba(0,0,0,0.7);color:#fff;border:2px solid #fff;border-radius:8px;pointer-events:auto;font-size:12px;font-weight:bold}
 </style>
 </head>
 <body>
 <div id="ui">
+    <div id="fs-toggle" onclick="toggleFS()">FULLSCREEN</div>
     <div id="inv">
         <div class="slot active" id="s1" onclick="sel(1,event)"></div>
-        <div class="slot" id="s8" onclick="sel(8,event)"></div> <div class="slot" id="s3" onclick="sel(3,event)"></div>
+        <div class="slot" id="s8" onclick="sel(8,event)"></div>
+        <div class="slot" id="s3" onclick="sel(3,event)"></div>
         <div class="slot" id="s4" onclick="sel(4,event)"></div>
     </div>
     <div class="btn" id="u">▲</div><div class="btn" id="d">▼</div>
@@ -42,6 +49,17 @@ let scene, camera, renderer, yaw, pitch, ray;
 let move = {f:0, b:0, l:0, r:0}, vel = 0, canJ = false, blocks = [], selected = 1;
 const texs = {};
 
+// Функція для повного екрану
+window.toggleFS = function() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(e => {
+            alert(`Помилка: ${e.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
 function mkTex(c1, c2, pattern='noise') {
     const can = document.createElement('canvas'); can.width = 16; can.height = 16;
     const ctx = can.getContext('2d');
@@ -60,29 +78,29 @@ init();
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 15, 65);
+    scene.fog = new THREE.Fog(0x87ceeb, 20, 70);
 
     texs[1] = mkTex('#5d8233', '#4a6929'); // трава
     texs[2] = mkTex('#795548', '#5d4037'); // земля
     texs[3] = mkTex('#808080', '#606060'); // камінь
-    texs[4] = mkTex('#6d4c41', '#4e342e'); // дерево стовбур
+    texs[4] = mkTex('#6d4c41', '#4e342e'); // колода
     texs[5] = mkTex('#1e88e5', '#1565c0'); // вода
     texs[6] = mkTex('#2e7d32', '#1b5e20'); // листя
     texs[7] = mkTex('#202020', '#000000'); // бедрок
-    texs[8] = mkTex('#bc986a', '#967342', 'planks'); // ДОШКИ
+    texs[8] = mkTex('#bc986a', '#967342', 'planks'); // дошки
 
-    const slots = [1, 8, 3, 4];
-    slots.forEach(id => {
+    [1, 8, 3, 4].forEach(id => {
         document.getElementById('s'+id).style.backgroundImage = `url(${texs[id].image.toDataURL()})`;
     });
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     pitch = new THREE.Object3D(); pitch.add(camera);
     yaw = new THREE.Object3D(); yaw.add(pitch);
-    yaw.position.set(15, 8, 15); scene.add(yaw);
+    yaw.position.set(15, 10, 15); scene.add(yaw);
 
     renderer = new THREE.WebGLRenderer({antialias: false});
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.4));
@@ -92,18 +110,19 @@ function init() {
 
     const b = (id, k) => {
         const el = document.getElementById(id);
-        el.onpointerdown = (e) => { e.preventDefault(); move[k] = 1; };
-        el.onpointerup = (e) => { e.preventDefault(); move[k] = 0; };
+        el.addEventListener('pointerdown', (e) => { e.preventDefault(); move[k] = 1; });
+        el.addEventListener('pointerup', (e) => { e.preventDefault(); move[k] = 0; });
+        el.addEventListener('pointerleave', () => { move[k] = 0; });
     };
     b("u","f"); b("d","b"); b("l","l"); b("r","r");
 
-    document.getElementById("jmp").onpointerdown = () => { if(canJ) vel = 0.22; };
-    document.getElementById("put").onpointerdown = () => interact(true);
-    document.getElementById("del").onpointerdown = () => interact(false);
+    document.getElementById("jmp").onpointerdown = (e) => { e.preventDefault(); if(canJ) vel = 0.22; };
+    document.getElementById("put").onpointerdown = (e) => { e.preventDefault(); interact(true); };
+    document.getElementById("del").onpointerdown = (e) => { e.preventDefault(); interact(false); };
 
     let lx, ly, isL = false;
     document.addEventListener("pointerdown", e => {
-        if(e.target.closest(".btn") || e.target.closest(".act") || e.target.closest(".slot")) return;
+        if(e.target.closest(".btn") || e.target.closest(".act") || e.target.closest(".slot") || e.id === "fs-toggle") return;
         lx = e.clientX; ly = e.clientY; isL = true;
     });
     document.addEventListener("pointermove", e => {
@@ -114,12 +133,19 @@ function init() {
         lx = e.clientX; ly = e.clientY;
     });
     document.addEventListener("pointerup", () => isL = false);
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
     loop();
 }
 
 function addB(x, y, z, t) {
     const mat = new THREE.MeshLambertMaterial({map: texs[t]});
-    if(t === 5) { mat.transparent = true; mat.opacity = 0.7; }
+    if(t === 5) { mat.transparent = true; mat.opacity = 0.6; }
     const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), mat);
     m.position.set(x, y, z); m.userData.type = t;
     scene.add(m); blocks.push(m);
@@ -129,26 +155,19 @@ function createWorld() {
     for(let x=0; x<40; x++) {
         for(let z=0; z<40; z++) {
             const dist = Math.sqrt((x-20)**2 + (z-20)**2);
-            
-            if(dist < 6) { // ОЗЕРО В ЦЕНТРІ
+            if(dist < 6) {
                 addB(x, 0, z, 5); // Вода
-                addB(x, -1, z, 2); // Дно озера
-                for(let y=-2; y>-5; y--) addB(x, y, z, 3);
+                addB(x, -1, z, 2); 
             } else {
                 addB(x, 0, z, 1); // Трава
-                for(let y=-1; y>-3; y--) addB(x, y, z, 2); // Земля
-                for(let y=-3; y>-6; y--) addB(x, y, z, 3); // Камінь
-                
-                // ДЕРЕВА (тільки не у воді)
+                addB(x, -1, z, 2); // Земля
                 if(Math.random() > 0.98 && x>2 && x<38 && z>2 && z<38) {
                     for(let h=1; h<=3; h++) addB(x, h, z, 4);
-                    for(let lx=-1; lx<=1; lx++) 
-                        for(let lz=-1; lz<=1; lz++) 
-                            for(let ly=3; ly<=5; ly++) 
-                                if(!(lx===0 && lz===0 && ly===3)) addB(x+lx, ly, z+lz, 6);
+                    for(let lx=-1; lx<=1; lx++) for(let lz=-1; lz<=1; lz++) for(let ly=3; ly<=5; ly++) if(!(lx===0 && lz===0 && ly===3)) addB(x+lx, ly, z+lz, 6);
                 }
             }
-            addB(x, -6, z, 7); // Бедрок на дні
+            for(let y=-2; y>-5; y--) addB(x, y, z, 3); // Камінь
+            addB(x, -5, z, 7); // Бедрок
         }
     }
 }
@@ -189,7 +208,7 @@ function loop() {
 
     let hit = false;
     for(let b of blocks) {
-        if(b.userData.type === 5) continue; // Крізь воду можна ходити
+        if(b.userData.type === 5) continue;
         if(Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1) hit = true;
     }
     if(hit) yaw.position.copy(oldP);
@@ -197,7 +216,7 @@ function loop() {
     yaw.position.y += vel;
     let floor = false;
     for(let b of blocks) {
-        if(b.userData.type === 5) continue; 
+        if(b.userData.type === 5) continue;
         if(Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
     }
     if(floor) { yaw.position.y = oldP.y; vel = 0; canJ = true; } else { canJ = false; }
