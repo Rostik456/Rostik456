@@ -3,75 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Mobile – FINAL FIX</title>
-
+<title>Minecraft Mobile – FIXED</title>
 <style>
-body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none}
+body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
 canvas{width:100vw;height:100vh;display:block}
 #ui-layer{position:absolute;inset:0;pointer-events:none}
-
-.touch-btn,.action-btn{
-pointer-events:auto;color:#fff;font-weight:bold;
-display:flex;align-items:center;justify-content:center}
-
-.touch-btn{
-position:absolute;width:55px;height:55px;
-background:rgba(0,0,0,.4);
-border:2px solid rgba(255,255,255,.5);
-border-radius:8px}
-
-#btn-up{bottom:130px;left:85px}
-#btn-down{bottom:20px;left:85px}
-#btn-left{bottom:75px;left:20px}
-#btn-right{bottom:75px;left:150px}
-
-.action-btn{
-position:absolute;width:80px;height:80px;
-border-radius:50%;border:2px solid #fff}
-
-#btn-jump{bottom:30px;right:130px;width:70px;height:70px}
-#btn-build{bottom:110px;right:30px;background:rgba(76,175,80,.7)}
-#btn-destroy{bottom:20px;right:30px;background:rgba(244,67,54,.7)}
-
-#inventory{
-position:absolute;top:15px;left:50%;
-transform:translateX(-50%);
-display:flex;gap:6px;
-background:rgba(0,0,0,.5);
-padding:6px;border-radius:10px;
-pointer-events:auto}
-
-.slot{width:40px;height:40px;border:2px solid #444}
+.touch-btn,.action-btn{pointer-events:auto;color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.5);border-radius:8px}
+.touch-btn{position:absolute;width:60px;height:60px}
+#btn-up{bottom:140px;left:80px}
+#btn-down{bottom:20px;left:80px}
+#btn-left{bottom:80px;left:10px}
+#btn-right{bottom:80px;left:150px}
+.action-btn{position:absolute;width:70px;height:70px;border-radius:50%}
+#btn-jump{bottom:20px;right:110px}
+#btn-build{bottom:100px;right:20px;background:rgba(76,175,80,.7)}
+#btn-destroy{bottom:20px;right:20px;background:rgba(244,67,54,.7)}
+#inventory{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.5);padding:5px;border-radius:8px;pointer-events:auto}
+.slot{width:35px;height:35px;border:2px solid #444;background-size:cover}
 .slot.active{border-color:#fff;box-shadow:0 0 8px #fff}
-
-#crosshair{
-position:absolute;top:50%;left:50%;
-width:14px;height:14px;
-border:2px solid #fff;border-radius:50%;
-transform:translate(-50%,-50%)}
+#crosshair{position:absolute;top:50%;left:50%;width:10px;height:10px;border:2px solid #fff;border-radius:50%;transform:translate(-50%,-50%)}
+#fs-btn{position:absolute;top:10px;right:10px;padding:10px;background:#000;color:#fff;pointer-events:auto;border-radius:5px;font-size:12px}
 </style>
 </head>
-
 <body>
 <div id="ui-layer">
+<div id="fs-btn" onclick="document.documentElement.requestFullscreen()">FULLSCREEN</div>
 <div id="crosshair"></div>
-
 <div id="inventory">
-<div class="slot active" onclick="setBlock(1)"></div>
-<div class="slot" onclick="setBlock(2)"></div>
-<div class="slot" onclick="setBlock(3)"></div>
-<div class="slot" onclick="setBlock(4)"></div>
-<div class="slot" onclick="setBlock(6)"></div>
+<div class="slot active" onclick="setBlock(1, event)" style="background-color:#5d8233"></div>
+<div class="slot" onclick="setBlock(2, event)" style="background-color:#795548"></div>
+<div class="slot" onclick="setBlock(3, event)" style="background-color:#808080"></div>
+<div class="slot" onclick="setBlock(4, event)" style="background-color:#6d4c41"></div>
+<div class="slot" onclick="setBlock(6, event)" style="background-color:#2e7d32"></div>
 </div>
-
-<div class="touch-btn" id="btn-up">W</div>
-<div class="touch-btn" id="btn-down">S</div>
-<div class="touch-btn" id="btn-left">A</div>
-<div class="touch-btn" id="btn-right">D</div>
-
-<div class="action-btn" id="btn-jump">JUMP</div>
-<div class="action-btn" id="btn-build">BUILD</div>
-<div class="action-btn" id="btn-destroy">KILL</div>
+<div class="touch-btn" id="btn-up">▲</div>
+<div class="touch-btn" id="btn-down">▼</div>
+<div class="touch-btn" id="btn-left">◀</div>
+<div class="touch-btn" id="btn-right">▶</div>
+<div class="action-btn" id="btn-jump">JMP</div>
+<div class="action-btn" id="btn-build">PUT</div>
+<div class="action-btn" id="btn-destroy">DEL</div>
 </div>
 
 <script type="importmap">
@@ -81,190 +52,31 @@ transform:translate(-50%,-50%)}
 <script type="module">
 import * as THREE from "three";
 
-let scene,camera,renderer,yaw,pitch,raycaster;
-let move={f:0,b:0,l:0,r:0};
-let vel=new THREE.Vector3();
-let canJump=false;
-let blocks=[];
-let selected=1;
+let scene, camera, renderer, yaw, pitch, raycaster;
+let move = {f:0, b:0, l:0, r:0};
+let vel = new THREE.Vector3();
+let canJump = false;
+let blocks = [];
+let selected = 1;
 
-const SIZE=50;
-const HEIGHT=1.7;
-
-/* ===== FULLSCREEN ===== */
-document.addEventListener("touchstart",()=>{
-if(document.fullscreenElement) return;
-document.documentElement.requestFullscreen?.();
-},{once:true});
-
-/* ===== TEXTURES ===== */
-function makeTex(color){
-const c=document.createElement("canvas");
-c.width=c.height=16;
-const g=c.getContext("2d");
-g.fillStyle=color;g.fillRect(0,0,16,16);
-for(let i=0;i<40;i++){
-g.fillStyle="rgba(0,0,0,.2)";
-g.fillRect(Math.random()*16,Math.random()*16,1,1);
-}
-const t=new THREE.CanvasTexture(c);
-t.magFilter=t.minFilter=THREE.NearestFilter;
-return t;
+function makeTex(color) {
+    const c = document.createElement("canvas"); c.width = c.height = 16;
+    const g = c.getContext("2d");
+    g.fillStyle = color; g.fillRect(0,0,16,16);
+    for(let i=0; i<30; i++) { g.fillStyle = "rgba(0,0,0,0.15)"; g.fillRect(Math.random()*16, Math.random()*16, 1, 1); }
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = t.minFilter = THREE.NearestFilter;
+    return t;
 }
 
-const TEX={
-1:makeTex("#5d8233"),
-2:makeTex("#795548"),
-3:makeTex("#808080"),
-4:makeTex("#6d4c41"),
-5:makeTex("#1e88e5"),
-6:makeTex("#2e7d32")
-};
+const TEX = { 1:makeTex("#5d8233"), 2:makeTex("#795548"), 3:makeTex("#808080"), 4:makeTex("#6d4c41"), 5:makeTex("#1e88e5"), 6:makeTex("#2e7d32") };
 
 init(); loop();
 
-function init(){
-scene=new THREE.Scene();
-scene.background=new THREE.Color(0x87ceeb);
-
-camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,1000);
-pitch=new THREE.Object3D(); pitch.add(camera);
-yaw=new THREE.Object3D(); yaw.add(pitch);
-yaw.position.set(10,5,10);
-scene.add(yaw);
-
-renderer=new THREE.WebGLRenderer({antialias:false});
-renderer.setSize(innerWidth,innerHeight);
-document.body.appendChild(renderer.domElement);
-
-scene.add(new THREE.AmbientLight(0xffffff,1.2));
-const sun=new THREE.DirectionalLight(0xffffff,.4);
-sun.position.set(10,50,10);
-scene.add(sun);
-
-raycaster=new THREE.Raycaster();
-world();
-
-btn("btn-up","f"); btn("btn-down","b");
-btn("btn-left","l"); btn("btn-right","r");
-
-document.getElementById("btn-jump").ontouchstart=()=>{if(canJump)vel.y=.22};
-document.getElementById("btn-build").ontouchstart=()=>interact(true);
-document.getElementById("btn-destroy").ontouchstart=()=>interact(false);
-
-/* ===== CAMERA LOOK ===== */
-let lx=0,ly=0,look=false;
-
-document.addEventListener("touchstart",e=>{
-if(e.target.closest(".touch-btn")||e.target.closest(".action-btn")||e.target.closest(".slot"))return;
-look=true;
-lx=e.touches[0].clientX;
-ly=e.touches[0].clientY;
-});
-
-document.addEventListener("touchmove",e=>{
-if(!look)return;
-const x=e.touches[0].clientX;
-const y=e.touches[0].clientY;
-yaw.rotation.y-=(x-lx)*0.005;
-pitch.rotation.x-=(y-ly)*0.005;
-pitch.rotation.x=Math.max(-1.5,Math.min(1.5,pitch.rotation.x));
-lx=x; ly=y;
-},{passive:false});
-
-document.addEventListener("touchend",()=>look=false);
-}
-
-function btn(id,k){
-const b=document.getElementById(id);
-b.ontouchstart=e=>{e.preventDefault();move[k]=1};
-b.ontouchend=e=>{e.preventDefault();move[k]=0};
-}
-
-function block(x,y,z,t,coll=true){
-const m=new THREE.Mesh(
-new THREE.BoxGeometry(1,1,1),
-new THREE.MeshLambertMaterial({
-map:TEX[t],
-transparent:t==5||t==6,
-opacity:t==5?.6:1
-})
-);
-m.position.set(x,y,z);
-scene.add(m);
-if(coll)blocks.push(m);
-}
-
-function world(){
-for(let x=0;x<SIZE;x++)
-for(let z=0;z<SIZE;z++){
-block(x,-1,z,2);
-block(x,0,z,1);
-if(Math.random()>.985){
-for(let y=1;y<=3;y++)block(x,y,z,4);
-for(let dx=-1;dx<=1;dx++)
-for(let dz=-1;dz<=1;dz++)
-block(x+dx,4,z+dz,6,false);
-}
-}
-}
-
-function collide(p){
-for(let b of blocks){
-if(Math.abs(p.x-b.position.x)<.6 &&
-Math.abs(p.z-b.position.z)<.6 &&
-Math.abs(p.y-HEIGHT/2-b.position.y)<1.1) return true;
-}
-return false;
-}
-
-function interact(place){
-raycaster.setFromCamera({x:0,y:0},camera);
-const h=raycaster.intersectObjects(scene.children)[0];
-if(!h)return;
-if(place){
-const p=h.object.position.clone().add(h.face.normal);
-block(p.x,p.y,p.z,selected);
-}else{
-scene.remove(h.object);
-blocks=blocks.filter(o=>o!==h.object);
-}
-}
-
-window.setBlock=i=>{
-selected=i;
-document.querySelectorAll(".slot").forEach(s=>s.classList.remove("active"));
-event.target.classList.add("active");
-};
-
-function loop(){
-requestAnimationFrame(loop);
-vel.y-=.01;
-
-/* === MOVE RELATIVE TO CAMERA === */
-const dir=new THREE.Vector3(
-move.r-move.l,
-0,
-move.b-move.f
-);
-dir.applyQuaternion(yaw.quaternion).normalize().multiplyScalar(.12);
-
-const old=yaw.position.clone();
-yaw.position.add(dir);
-if(collide(yaw.position)) yaw.position.copy(old);
-
-yaw.position.y+=vel.y;
-if(collide(yaw.position)){
-yaw.position.y=old.y;
-vel.y=0;
-canJump=true;
-}
-
-renderer.render(scene,camera);
-}
-</script>
-</body>
-</html>
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    camera = new THREE.
 
 
 
