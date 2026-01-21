@@ -3,22 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Mobile: Sapling Update</title>
+<title>Minecraft Direct Start</title>
 <style>
-body{margin:0;overflow:hidden;background:#000;touch-action:none;font-family:sans-serif}
-canvas{width:100%;height:100%;display:none}
+body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
+canvas{width:100%;height:100%;display:block}
 
-/* ПРИЦІЛ (ХРЕСТИК) */
-#crosshair{position:absolute;top:50%;left:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none;z-index:20;display:none}
+/* ПРИЦІЛ */
+#crosshair{position:absolute;top:50%;left:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none;z-index:20}
 #crosshair::before, #crosshair::after{content:'';position:absolute;background:#fff;opacity:0.8}
 #crosshair::before{top:9px;left:0;width:20px;height:2px}
 #crosshair::after{top:0;left:9px;width:2px;height:20px}
 
-#menu{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url('https://wallpaperaccess.com/full/465600.jpg');background-size:cover;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:20px}
-#menu h1{color:white;text-shadow:4px 4px #000;font-size:40px}
-.m-btn{width:250px;padding:15px;background:#5d8233;border:4px solid #3a5220;color:white;font-weight:bold;font-size:18px;text-align:center;text-shadow:2px 2px #000;cursor:pointer;pointer-events:auto}
-
-#ui{position:absolute;inset:0;pointer-events:none;z-index:10;display:none}
+#ui{position:absolute;inset:0;pointer-events:none;z-index:10}
 .btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:60px;height:60px;user-select:none}
 #u{bottom:140px;left:80px} #d{bottom:20px;left:80px} #l{bottom:80px;left:10px} #r{bottom:80px;left:150px}
 .act{position:absolute;width:75px;height:75px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
@@ -31,12 +27,6 @@ canvas{width:100%;height:100%;display:none}
 </head>
 <body>
 
-<div id="menu">
-    <h1>MINECRAFT</h1>
-    <div class="m-btn" onclick="startGame(false)">НОВА ГРА</div>
-    <div class="m-btn" onclick="startGame(true)">ПРОДОВЖИТИ</div>
-</div>
-
 <div id="crosshair"></div>
 
 <div id="ui">
@@ -46,7 +36,8 @@ canvas{width:100%;height:100%;display:none}
         <div class="slot" id="s8" onclick="sel(8,event)"></div>
         <div class="slot" id="s9" onclick="sel(9,event)"></div>
         <div class="slot" id="s3" onclick="sel(3,event)"></div>
-        <div class="slot" id="s10" onclick="sel(10,event)"></div> </div>
+        <div class="slot" id="s10" onclick="sel(10,event)"></div>
+    </div>
     <div class="btn" id="u">▲</div><div class="btn" id="d">▼</div>
     <div class="btn" id="l">◀</div><div class="btn" id="r">▶</div>
     <button class="act" id="jmp">JMP</button>
@@ -77,161 +68,14 @@ function mkTex(c1, c2, pattern='noise') {
     const t = new THREE.CanvasTexture(can); t.magFilter = THREE.NearestFilter; return t;
 }
 
-window.startGame = (loadExisting) => {
-    document.getElementById('menu').style.display = 'none';
-    document.getElementById('ui').style.display = 'block';
-    document.getElementById('crosshair').style.display = 'block';
-    document.querySelector('canvas').style.display = 'block';
-    init(loadExisting);
-}
-
-function init(loadExisting) {
+function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
     scene.fog = new THREE.Fog(0x87ceeb, 25, 75);
 
     texs[1] = mkTex('#5d8233', '#4a6929');
     texs[2] = mkTex('#795548', '#5d4037');
-    texs[3] = mkTex('#808080', '#606060');
-    texs[4] = mkTex('#6d4c41', '#4e342e');
-    texs[5] = mkTex('#1e88e5', '#1565c0');
-    texs[6] = mkTex('#2e7d32', '#1b5e20');
-    texs[7] = mkTex('#202020', '#000000');
-    texs[8] = mkTex('#bc986a', '#967342', 'planks');
-    texs[9] = mkTex('#b53f3f', '#8c2f2f', 'brick');
-    texs[10] = mkTex('#795548', '#2e7d32', 'sapling'); // Саджанець
-
-    [1, 8, 9, 3, 10].forEach(id => document.getElementById('s'+id).style.backgroundImage = `url(${texs[id].image.toDataURL()})`);
-
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    pitch = new THREE.Object3D(); pitch.add(camera);
-    yaw = new THREE.Object3D(); yaw.add(pitch);
-    scene.add(yaw);
-
-    renderer = new THREE.WebGLRenderer({antialias: false});
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-    ray = new THREE.Raycaster();
-
-    if (loadExisting && localStorage.getItem('mc_save')) loadWorld();
-    else { yaw.position.set(20, 10, 20); createWorld(); }
-
-    const b = (id, k) => {
-        const el = document.getElementById(id);
-        el.onpointerdown = (e) => { e.stopPropagation(); move[k] = 1; };
-        el.onpointerup = () => move[k] = 0;
-        el.onpointerleave = () => move[k] = 0;
-    };
-    b("u","f"); b("d","b"); b("l","l"); b("r","r");
-
-    document.getElementById("jmp").onpointerdown = (e) => { if(canJ) vel = 0.22; e.stopPropagation(); };
-    document.getElementById("put").onpointerdown = (e) => { interact(true); e.stopPropagation(); };
-    document.getElementById("del").onpointerdown = (e) => { interact(false); e.stopPropagation(); };
-
-    let lx, ly, touchID = null;
-    renderer.domElement.addEventListener("pointerdown", e => { if (touchID === null) { touchID = e.pointerId; lx = e.clientX; ly = e.clientY; }});
-    renderer.domElement.addEventListener("pointermove", e => {
-        if (e.pointerId === touchID) {
-            yaw.rotation.y -= (e.clientX - lx) * 0.004;
-            pitch.rotation.x -= (e.clientY - ly) * 0.004;
-            pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
-            lx = e.clientX; ly = e.clientY;
-        }
-    });
-    renderer.domElement.addEventListener("pointerup", () => touchID = null);
-    setInterval(saveWorld, 5000);
-    loop();
-}
-
-function addB(x, y, z, t) {
-    const mat = new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1});
-    const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), mat);
-    m.position.set(x, y, z); m.userData.type = t;
-    scene.add(m); blocks.push(m);
-    return m;
-}
-
-function growTree(x, y, z) {
-    for(let h=0; h<=3; h++) addB(x, y+h, z, 4);
-    for(let lx=-1; lx<=1; lx++) for(let lz=-1; lz<=1; lz++) for(let ly=3; ly<=5; ly++) 
-        if(!(lx===0 && lz===0 && ly===3)) addB(x+lx, y+ly, z+lz, 6);
-}
-
-function createWorld() {
-    for(let x=0; x<40; x++) for(let z=0; z<40; z++) {
-        const dist = Math.sqrt((x-20)**2 + (z-20)**2);
-        if(dist < 6) { addB(x, 0, z, 5); addB(x, -1, z, 2); } 
-        else { addB(x, 0, z, 1); addB(x, -1, z, 2); }
-        for(let y=-2; y>-4; y--) addB(x, y, z, 3);
-        addB(x, -4, z, 7);
-    }
-}
-
-function saveWorld() {
-    const data = { pos: yaw.position, rot: {y: yaw.rotation.y, x: pitch.rotation.x}, blocks: blocks.map(b => ({x: b.position.x, y: b.position.y, z: b.position.z, t: b.userData.type})) };
-    localStorage.setItem('mc_save', JSON.stringify(data));
-    const s = document.getElementById('save-anim'); s.style.display = 'block'; setTimeout(() => s.style.display = 'none', 1000);
-}
-
-function loadWorld() {
-    const data = JSON.parse(localStorage.getItem('mc_save'));
-    yaw.position.copy(data.pos); yaw.rotation.y = data.rot.y; pitch.rotation.x = data.rot.x;
-    data.blocks.forEach(b => addB(b.x, b.y, b.z, b.t));
-}
-
-function interact(isP) {
-    ray.setFromCamera({x:0, y:0}, camera);
-    const h = ray.intersectObjects(blocks)[0];
-    if(!h || h.distance > 5) return;
-    if(isP) {
-        const p = h.object.position.clone().add(h.face.normal);
-        if(selected === 10) growTree(p.x, p.y, p.z);
-        else addB(p.x, p.y, p.z, selected);
-    } else if(h.object.userData.type !== 7) {
-        scene.remove(h.object); blocks = blocks.filter(o => o !== h.object);
-    }
-    saveWorld();
-}
-
-window.sel = (i, e) => {
-    selected = i;
-    document.querySelectorAll(".slot").forEach(s => s.classList.remove('active'));
-    (e.target.classList.contains('slot') ? e.target : e.target.parentElement).classList.add('active');
-};
-
-function loop() {
-    requestAnimationFrame(loop);
-    vel -= 0.01;
-    const oldP = yaw.position.clone();
-    const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
-    const rgt = new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion);
-    fwd.y = 0; rgt.y = 0; fwd.normalize(); rgt.normalize();
-    if(move.f) yaw.position.add(fwd.multiplyScalar(0.12));
-    if(move.b) yaw.position.add(fwd.multiplyScalar(-0.12));
-    if(move.l) yaw.position.add(rgt.multiplyScalar(-0.12));
-    if(move.r) yaw.position.add(rgt.multiplyScalar(0.12));
-
-    let hit = false;
-    for(let b of blocks) {
-        if(b.userData.type === 5) continue;
-        if(Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1.2) hit = true;
-    }
-    if(hit) yaw.position.copy(oldP);
-
-    yaw.position.y += vel;
-    let floor = false;
-    for(let b of blocks) {
-        if(b.userData.type === 5) continue;
-        if(Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
-    }
-    if(floor) { yaw.position.y = oldP.y; vel = 0; canJ = true; } else canJ = false;
-    renderer.render(scene, camera);
-}
-</script>
-</body>
-</html>
+    texs[3] = mkTex('#8
 
 
 
