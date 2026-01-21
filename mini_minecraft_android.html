@@ -3,53 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft Fixed Control</title>
+    <title>Minecraft Mobile Final Fix</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; font-family: sans-serif; user-select: none; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #87ceeb; touch-action: none; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         
-        /* Кнопки керування */
-        .btn { 
-            position: absolute; background: rgba(0,0,0,0.4); border: 2px solid #fff; 
-            border-radius: 10px; pointer-events: auto; display: flex; 
-            align-items: center; justify-content: center; color: white; font-size: 24px;
-            width: 65px; height: 65px; active-background: rgba(255,255,255,0.4);
-        }
-        .btn:active { background: rgba(255,255,255,0.4); transform: scale(0.95); }
-        
-        #up { bottom: 150px; left: 95px; }
-        #down { bottom: 20px; left: 95px; }
-        #left { bottom: 85px; left: 20px; }
-        #right { bottom: 85px; left: 170px; }
-        
-        .act { position: absolute; border-radius: 50%; border: 2px solid white; pointer-events: auto; color: white; display: flex; align-items: center; justify-content: center; }
-        #jump { bottom: 40px; right: 140px; width: 80px; height: 80px; background: rgba(255,255,255,0.2); }
-        #build { bottom: 130px; right: 30px; width: 90px; height: 90px; background: rgba(76, 175, 80, 0.7); }
-        #kill { bottom: 20px; right: 30px; width: 90px; height: 90px; background: rgba(244, 67, 54, 0.7); }
+        /* Кнопки ходьби - фіксований розмір */
+        .joy { position: absolute; bottom: 30px; left: 30px; width: 180px; height: 180px; pointer-events: auto; }
+        .b { position: absolute; width: 55px; height: 55px; background: rgba(0,0,0,0.5); border: 2px solid #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px; }
+        #u { top: 0; left: 60px; }
+        #d { bottom: 0; left: 60px; }
+        #l { top: 60px; left: 0; }
+        #r { top: 60px; right: 0; }
 
-        #inv { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; pointer-events: auto; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 12px; }
-        .slot { width: 45px; height: 45px; border: 2px solid #555; background-size: cover; border-radius: 5px; }
-        .slot.active { border-color: #fff; box-shadow: 0 0 15px #fff; }
-        #cross { position: absolute; top: 50%; left: 50%; width: 15px; height: 15px; border: 2px solid white; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.5; }
+        /* Кнопки дій */
+        .actions { position: absolute; bottom: 30px; right: 30px; pointer-events: auto; display: flex; flex-direction: column; gap: 10px; }
+        .a { width: 70px; height: 70px; border-radius: 50%; border: 2px solid #fff; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
+        #jump { background: rgba(255,255,255,0.2); }
+        #put { background: rgba(76, 175, 80, 0.8); }
+        #del { background: rgba(244, 67, 54, 0.8); }
+
+        /* Інвентар */
+        #inv { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; pointer-events: auto; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 10px; }
+        .slot { width: 40px; height: 40px; border: 2px solid #555; background-size: cover; }
+        .slot.active { border-color: #fff; box-shadow: 0 0 10px #fff; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div id="cross"></div>
     <div id="inv">
-        <div class="slot active" id="i1" onclick="window.setB(1)"></div>
-        <div class="slot" id="i4" onclick="window.setB(4)"></div>
-        <div class="slot" id="i6" onclick="window.setB(6)"></div>
-        <div class="slot" id="i3" onclick="window.setB(3)"></div>
-        <div class="slot" id="i5" onclick="window.setB(5)"></div>
+        <div class="slot active" id="s1" onclick="window.setB(1)"></div>
+        <div class="slot" id="s4" onclick="window.setB(4)"></div>
+        <div class="slot" id="s6" onclick="window.setB(6)"></div>
+        <div class="slot" id="s3" onclick="window.setB(3)"></div>
+        <div class="slot" id="s5" onclick="window.setB(5)"></div>
     </div>
-    <div class="btn" id="up">↑</div><div class="btn" id="down">↓</div>
-    <div class="btn" id="left">←</div><div class="btn" id="right">→</div>
-    <div class="act" id="jump">JUMP</div>
-    <div class="act" id="build">BUILD</div>
-    <div class="act" id="kill">KILL</div>
+    <div class="joy">
+        <div class="b" id="u">▲</div><div class="b" id="l">◀</div>
+        <div class="b" id="r">▶</div><div class="b" id="d">▼</div>
+    </div>
+    <div class="actions">
+        <div class="a" id="put">PUT</div>
+        <div class="a" id="jump">JUMP</div>
+        <div class="a" id="del">DEL</div>
+    </div>
 </div>
 
 <script type="importmap">
@@ -60,7 +58,7 @@
     import * as THREE from 'three';
 
     let scene, camera, renderer, yaw, pitch, ray;
-    let move = { f: 0, b: 0, l: 0, r: 0 };
+    let move = { f:0, b:0, l:0, r:0 };
     let vel = new THREE.Vector3();
     let objects = [];
     let selB = 1, lastTX = 0, lastTY = 0;
@@ -70,11 +68,15 @@
         const can = document.createElement('canvas'); can.width = 16; can.height = 16;
         const ctx = can.getContext('2d');
         ctx.fillStyle = c1; ctx.fillRect(0,0,16,16);
-        ctx.fillStyle = c2; for(let i=0; i<30; i++) ctx.fillRect(Math.random()*16, Math.random()*16, 2, 2);
+        ctx.fillStyle = c2; for(let i=0; i<20; i++) ctx.fillRect(Math.random()*16, Math.random()*16, 2, 2);
         const t = new THREE.CanvasTexture(can); t.magFilter = THREE.NearestFilter; return t;
     }
 
-    init();
+    try {
+        init();
+    } catch (e) {
+        alert("Помилка запуску: " + e.message);
+    }
 
     function init() {
         scene = new THREE.Scene();
@@ -84,12 +86,14 @@
         texs[3] = mkTex('#808080', '#696969'); texs[4] = mkTex('#614126', '#4e341e');
         texs[5] = mkTex('#1e88e5', '#1976d2'); texs[6] = mkTex('#2e7d32', '#1b5e20');
 
-        [1, 4, 6, 3, 5].forEach(id => document.getElementById('i'+id).style.backgroundImage = `url(${texs[id].image.toDataURL()})`);
+        [1, 4, 6, 3, 5].forEach(id => {
+            document.getElementById('s'+id).style.backgroundImage = `url(${texs[id].image.toDataURL()})`;
+        });
 
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         pitch = new THREE.Object3D(); pitch.add(camera);
         yaw = new THREE.Object3D(); yaw.add(pitch);
-        yaw.position.set(12, 5, 12); scene.add(yaw);
+        yaw.position.set(5, 5, 5); scene.add(yaw);
 
         renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -98,43 +102,45 @@
         scene.add(new THREE.AmbientLight(0xffffff, 1.5));
         ray = new THREE.Raycaster();
 
-        // Генеруємо карту
-        for(let x=0; x<25; x++) {
-            for(let z=0; z<25; z++) {
+        // Світ
+        for(let x=0; x<20; x++) {
+            for(let z=0; z<20; z++) {
                 addB(x, 0, z, 1);
-                if(Math.random() > 0.98) { for(let i=1; i<4; i++) addB(x, i, z, 4); addB(x, 4, z, 6); }
+                if(Math.random() > 0.97) { addB(x, 1, z, 4); addB(x, 2, z, 6); }
             }
         }
 
-        // Обробка кнопок (виправлено для Android)
-        const bind = (id, k) => {
+        const setup = (id, k) => {
             const el = document.getElementById(id);
             el.addEventListener('touchstart', (e) => { e.preventDefault(); move[k] = 1; }, {passive: false});
             el.addEventListener('touchend', (e) => { e.preventDefault(); move[k] = 0; }, {passive: false});
         };
-        bind('up', 'f'); bind('down', 'b'); bind('left', 'l'); bind('right', 'r');
+        setup('u', 'f'); setup('d', 'b'); setup('l', 'l'); setup('r', 'r');
 
-        document.getElementById('jump').addEventListener('touchstart', (e) => { e.preventDefault(); vel.y = 0.2; });
-        document.getElementById('build').addEventListener('touchstart', (e) => { e.preventDefault(); interact(true); });
-        document.getElementById('kill').addEventListener('touchstart', (e) => { e.preventDefault(); interact(false); });
+        document.getElementById('jump').addEventListener('touchstart', e => { e.preventDefault(); vel.y = 0.2; }, {passive: false});
+        document.getElementById('put').addEventListener('touchstart', e => { e.preventDefault(); interact(true); }, {passive: false});
+        document.getElementById('del').addEventListener('touchstart', e => { e.preventDefault(); interact(false); }, {passive: false});
 
-        // Огляд пальцем
-        document.addEventListener('touchstart', e => { if(e.target.tagName !== 'DIV') return; lastTX = e.touches[0].clientX; lastTY = e.touches[0].clientY; });
+        document.addEventListener('touchstart', e => { 
+            if(e.touches[0].clientX > window.innerWidth / 2) {
+                lastTX = e.touches[0].clientX; lastTY = e.touches[0].clientY; 
+            }
+        }, {passive: false});
         document.addEventListener('touchmove', e => {
-            if(e.target.className.includes('btn') || e.target.className.includes('act')) return;
-            yaw.rotation.y -= (e.touches[0].clientX - lastTX) * 0.008;
-            pitch.rotation.x -= (e.touches[0].clientY - lastTY) * 0.008;
+            if(e.target.className.includes('b') || e.target.className.includes('a')) return;
+            yaw.rotation.y -= (e.touches[0].clientX - lastTX) * 0.007;
+            pitch.rotation.x -= (e.touches[0].clientY - lastTY) * 0.007;
             pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
             lastTX = e.touches[0].clientX; lastTY = e.touches[0].clientY;
         }, { passive: false });
 
-        window.setB = (id) => { selB = id; document.querySelectorAll('.slot').forEach(s => s.classList.remove('active')); document.getElementById('i'+id).classList.add('active'); };
+        window.setB = (id) => { selB = id; document.querySelectorAll('.slot').forEach(s => s.classList.remove('active')); document.getElementById('s'+id).classList.add('active'); };
         
         loop();
     }
 
     function addB(x, y, z, t) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1}));
+        const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({map: texs[t]}));
         m.position.set(x, y, z); scene.add(m); objects.push(m);
     }
 
@@ -149,22 +155,15 @@
 
     function loop() {
         requestAnimationFrame(loop);
-        
-        // Спрощена гравітація (щоб не провалюватись)
-        vel.y -= 0.01;
-        yaw.position.y += vel.y;
+        vel.y -= 0.01; yaw.position.y += vel.y;
         if(yaw.position.y < 1.8) { yaw.position.y = 1.8; vel.y = 0; }
-
-        // Рух
         const speed = 0.12;
         const forward = new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
         const right = new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion);
-        
         if(move.f) yaw.position.add(forward.multiplyScalar(speed));
         if(move.b) yaw.position.add(forward.multiplyScalar(-speed));
         if(move.l) yaw.position.add(right.multiplyScalar(-speed));
         if(move.r) yaw.position.add(right.multiplyScalar(speed));
-
         renderer.render(scene, camera);
     }
 </script>
