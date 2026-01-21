@@ -1,3 +1,252 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Minecraft Mobile – Textured</title>
+
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #87ceeb;
+    touch-action: none;
+    user-select: none;
+}
+canvas { width: 100vw; height: 100vh; display: block; }
+
+#ui-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.touch-btn, .action-btn {
+    pointer-events: auto;
+    color: white;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.touch-btn {
+    position: absolute;
+    width: 55px;
+    height: 55px;
+    background: rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 8px;
+}
+
+#btn-up { bottom:130px; left:85px; }
+#btn-down { bottom:20px; left:85px; }
+#btn-left { bottom:75px; left:20px; }
+#btn-right { bottom:75px; left:150px; }
+
+.action-btn {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+#btn-jump { bottom:30px; right:130px; width:70px; height:70px; }
+#btn-build { bottom:110px; right:30px; background:rgba(76,175,80,0.7); }
+#btn-destroy { bottom:20px; right:30px; background:rgba(244,67,54,0.7); }
+
+#inventory {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    background: rgba(0,0,0,0.5);
+    padding: 6px;
+    border-radius: 10px;
+    pointer-events: auto;
+}
+
+.slot {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #444;
+    background-size: cover;
+}
+
+.slot.active {
+    border-color: white;
+    box-shadow: 0 0 8px white;
+}
+
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+}
+</style>
+</head>
+
+<body>
+<div id="ui-layer">
+<div id="crosshair"></div>
+
+<div id="inventory">
+    <div class="slot active" style="background-image:url('https://i.imgur.com/8KQZK6U.png')" onclick="setBlock(1)"></div>
+    <div class="slot" style="background-image:url('https://i.imgur.com/QZ6kR9F.png')" onclick="setBlock(2)"></div>
+    <div class="slot" style="background-image:url('https://i.imgur.com/U6XKp9C.png')" onclick="setBlock(3)"></div>
+    <div class="slot" style="background-image:url('https://i.imgur.com/sPz1Z4U.png')" onclick="setBlock(4)"></div>
+    <div class="slot" style="background-image:url('https://i.imgur.com/Zc9M6kF.png')" onclick="setBlock(6)"></div>
+</div>
+
+<div class="touch-btn" id="btn-up">W</div>
+<div class="touch-btn" id="btn-down">S</div>
+<div class="touch-btn" id="btn-left">A</div>
+<div class="touch-btn" id="btn-right">D</div>
+
+<div class="action-btn" id="btn-jump">JUMP</div>
+<div class="action-btn" id="btn-build">BUILD</div>
+<div class="action-btn" id="btn-destroy">KILL</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+
+let scene, camera, renderer, yawObj, pitchObj, raycaster;
+let move = { f:0, b:0, l:0, r:0 };
+let velocity = new THREE.Vector3();
+let canJump = false, isInWater = false;
+let objects = [];
+let selectedBlock = 1;
+
+const textureLoader = new THREE.TextureLoader();
+const loadTex = url => {
+    const t = textureLoader.load(url);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    return t;
+};
+
+const textures = {
+    1: loadTex("https://i.imgur.com/8KQZK6U.png"), // grass
+    2: loadTex("https://i.imgur.com/QZ6kR9F.png"), // dirt
+    3: loadTex("https://i.imgur.com/U6XKp9C.png"), // stone
+    4: loadTex("https://i.imgur.com/sPz1Z4U.png"), // log
+    5: loadTex("https://i.imgur.com/w1X0QbF.png"), // water
+    6: loadTex("https://i.imgur.com/Zc9M6kF.png")  // leaves
+};
+
+init();
+function init(){
+scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+
+camera = new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,1000);
+pitchObj = new THREE.Object3D();
+pitchObj.add(camera);
+yawObj = new THREE.Object3D();
+yawObj.add(pitchObj);
+yawObj.position.set(10,5,10);
+scene.add(yawObj);
+
+renderer = new THREE.WebGLRenderer({antialias:false});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff,1.1));
+const sun = new THREE.DirectionalLight(0xffffff,0.4);
+sun.position.set(10,50,10);
+scene.add(sun);
+
+raycaster = new THREE.Raycaster();
+generateWorld();
+loop();
+
+addBtn("btn-up","f"); addBtn("btn-down","b");
+addBtn("btn-left","l"); addBtn("btn-right","r");
+
+document.getElementById("btn-jump").ontouchstart=()=>{ if(canJump) velocity.y=0.22; };
+document.getElementById("btn-build").ontouchstart=()=>interact(true);
+document.getElementById("btn-destroy").ontouchstart=()=>interact(false);
+}
+
+function addBtn(id,key){
+const b=document.getElementById(id);
+b.ontouchstart=e=>{e.preventDefault();move[key]=1;}
+b.ontouchend=e=>{e.preventDefault();move[key]=0;}
+}
+
+function addBlock(x,y,z,type,coll=true){
+const mat = new THREE.MeshLambertMaterial({
+    map: textures[type],
+    transparent: type==5 || type==6,
+    opacity: type==5 ? 0.7 : 1
+});
+const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1),mat);
+m.position.set(Math.floor(x),Math.floor(y),Math.floor(z));
+scene.add(m);
+if(coll) objects.push(m);
+}
+
+function generateWorld(){
+for(let x=0;x<50;x++)
+for(let z=0;z<50;z++){
+addBlock(x,-1,z,2);
+addBlock(x,0,z,1);
+if(Math.random()>0.985){
+for(let y=1;y<=3;y++) addBlock(x,y,z,4);
+for(let dx=-1;dx<=1;dx++)
+for(let dz=-1;dz<=1;dz++)
+addBlock(x+dx,4,z+dz,6,false);
+}
+}
+}
+
+function interact(place){
+raycaster.setFromCamera({x:0,y:0},camera);
+const hits=raycaster.intersectObjects(scene.children);
+if(!hits.length) return;
+const h=hits[0];
+if(place){
+const p=h.object.position.clone().add(h.face.normal);
+addBlock(p.x,p.y,p.z,selectedBlock);
+}else{
+scene.remove(h.object);
+objects=objects.filter(o=>o!==h.object);
+}
+}
+
+window.setBlock=id=>{
+selectedBlock=id;
+document.querySelectorAll(".slot").forEach(s=>s.classList.remove("active"));
+event.target.classList.add("active");
+};
+
+function loop(){
+requestAnimationFrame(loop);
+velocity.y-=0.01;
+yawObj.position.y+=velocity.y;
+renderer.render(scene,camera);
+}
+</script>
+</body>
+</html>
+
 
 
 
