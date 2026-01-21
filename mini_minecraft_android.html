@@ -3,31 +3,59 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Mobile – FIXED</title>
+<title>Minecraft Mobile – FULL FIX</title>
+
 <style>
 body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none}
 canvas{width:100vw;height:100vh;display:block}
 #ui-layer{position:absolute;inset:0;pointer-events:none}
-.touch-btn,.action-btn{pointer-events:auto;color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center}
-.touch-btn{position:absolute;width:55px;height:55px;background:rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.5);border-radius:8px}
+
+.touch-btn,.action-btn{
+pointer-events:auto;color:#fff;font-weight:bold;
+display:flex;align-items:center;justify-content:center}
+
+.touch-btn{
+position:absolute;width:55px;height:55px;
+background:rgba(0,0,0,.4);
+border:2px solid rgba(255,255,255,.5);
+border-radius:8px}
+
 #btn-up{bottom:130px;left:85px}
 #btn-down{bottom:20px;left:85px}
 #btn-left{bottom:75px;left:20px}
 #btn-right{bottom:75px;left:150px}
-.action-btn{position:absolute;width:80px;height:80px;border-radius:50%;border:2px solid #fff}
+
+.action-btn{
+position:absolute;width:80px;height:80px;
+border-radius:50%;border:2px solid #fff}
+
 #btn-jump{bottom:30px;right:130px;width:70px;height:70px}
 #btn-build{bottom:110px;right:30px;background:rgba(76,175,80,.7)}
 #btn-destroy{bottom:20px;right:30px;background:rgba(244,67,54,.7)}
-#inventory{position:absolute;top:15px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(0,0,0,.5);padding:6px;border-radius:10px;pointer-events:auto}
+
+#inventory{
+position:absolute;top:15px;left:50%;
+transform:translateX(-50%);
+display:flex;gap:6px;
+background:rgba(0,0,0,.5);
+padding:6px;border-radius:10px;
+pointer-events:auto}
+
 .slot{width:40px;height:40px;border:2px solid #444}
 .slot.active{border-color:#fff;box-shadow:0 0 8px #fff}
-#crosshair{position:absolute;top:50%;left:50%;width:14px;height:14px;border:2px solid #fff;border-radius:50%;transform:translate(-50%,-50%)}
+
+#crosshair{
+position:absolute;top:50%;left:50%;
+width:14px;height:14px;
+border:2px solid #fff;border-radius:50%;
+transform:translate(-50%,-50%)}
 </style>
 </head>
 
 <body>
 <div id="ui-layer">
 <div id="crosshair"></div>
+
 <div id="inventory">
 <div class="slot active" onclick="setBlock(1)"></div>
 <div class="slot" onclick="setBlock(2)"></div>
@@ -35,10 +63,12 @@ canvas{width:100vw;height:100vh;display:block}
 <div class="slot" onclick="setBlock(4)"></div>
 <div class="slot" onclick="setBlock(6)"></div>
 </div>
+
 <div class="touch-btn" id="btn-up">W</div>
 <div class="touch-btn" id="btn-down">S</div>
 <div class="touch-btn" id="btn-left">A</div>
 <div class="touch-btn" id="btn-right">D</div>
+
 <div class="action-btn" id="btn-jump">JUMP</div>
 <div class="action-btn" id="btn-build">BUILD</div>
 <div class="action-btn" id="btn-destroy">KILL</div>
@@ -58,18 +88,18 @@ let canJump=false;
 let blocks=[];
 let selected=1;
 
-const size=50;
-const height=1.7;
+const SIZE=50;
+const HEIGHT=1.7;
 
-/* ====== TEXTURES (NO INTERNET) ====== */
-function tex(color){
+/* ===== TEXTURES ===== */
+function makeTex(color){
 const c=document.createElement("canvas");
 c.width=c.height=16;
-const x=c.getContext("2d");
-x.fillStyle=color;x.fillRect(0,0,16,16);
-for(let i=0;i<30;i++){
-x.fillStyle="rgba(0,0,0,.15)";
-x.fillRect(Math.random()*16,Math.random()*16,1,1);
+const g=c.getContext("2d");
+g.fillStyle=color;g.fillRect(0,0,16,16);
+for(let i=0;i<40;i++){
+g.fillStyle="rgba(0,0,0,.2)";
+g.fillRect(Math.random()*16,Math.random()*16,1,1);
 }
 const t=new THREE.CanvasTexture(c);
 t.magFilter=t.minFilter=THREE.NearestFilter;
@@ -77,12 +107,12 @@ return t;
 }
 
 const TEX={
-1:tex("#5d8233"), // grass
-2:tex("#795548"), // dirt
-3:tex("#808080"), // stone
-4:tex("#6d4c41"), // wood
-5:tex("#1e88e5"), // water
-6:tex("#2e7d32")  // leaves
+1:makeTex("#5d8233"),
+2:makeTex("#795548"),
+3:makeTex("#808080"),
+4:makeTex("#6d4c41"),
+5:makeTex("#1e88e5"),
+6:makeTex("#2e7d32")
 };
 
 init(); loop();
@@ -90,6 +120,7 @@ init(); loop();
 function init(){
 scene=new THREE.Scene();
 scene.background=new THREE.Color(0x87ceeb);
+
 camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,1000);
 pitch=new THREE.Object3D(); pitch.add(camera);
 yaw=new THREE.Object3D(); yaw.add(pitch);
@@ -108,10 +139,34 @@ scene.add(sun);
 raycaster=new THREE.Raycaster();
 world();
 
-btn("btn-up","f");btn("btn-down","b");btn("btn-left","l");btn("btn-right","r");
+btn("btn-up","f"); btn("btn-down","b");
+btn("btn-left","l"); btn("btn-right","r");
+
 document.getElementById("btn-jump").ontouchstart=()=>{if(canJump)vel.y=.22};
 document.getElementById("btn-build").ontouchstart=()=>interact(true);
 document.getElementById("btn-destroy").ontouchstart=()=>interact(false);
+
+/* ===== CAMERA LOOK ===== */
+let lx=0,ly=0,look=false;
+
+document.addEventListener("touchstart",e=>{
+if(e.target.closest(".touch-btn")||e.target.closest(".action-btn")||e.target.closest(".slot"))return;
+look=true;
+lx=e.touches[0].clientX;
+ly=e.touches[0].clientY;
+});
+
+document.addEventListener("touchmove",e=>{
+if(!look)return;
+const x=e.touches[0].clientX;
+const y=e.touches[0].clientY;
+yaw.rotation.y-=(x-lx)*0.005;
+pitch.rotation.x-=(y-ly)*0.005;
+pitch.rotation.x=Math.max(-1.5,Math.min(1.5,pitch.rotation.x));
+lx=x; ly=y;
+},{passive:false});
+
+document.addEventListener("touchend",()=>look=false);
 }
 
 function btn(id,k){
@@ -123,7 +178,11 @@ b.ontouchend=e=>{e.preventDefault();move[k]=0};
 function block(x,y,z,t,coll=true){
 const m=new THREE.Mesh(
 new THREE.BoxGeometry(1,1,1),
-new THREE.MeshLambertMaterial({map:TEX[t],transparent:t==5||t==6,opacity:t==5?.6:1})
+new THREE.MeshLambertMaterial({
+map:TEX[t],
+transparent:t==5||t==6,
+opacity:t==5?.6:1
+})
 );
 m.position.set(x,y,z);
 scene.add(m);
@@ -131,8 +190,8 @@ if(coll)blocks.push(m);
 }
 
 function world(){
-for(let x=0;x<size;x++)
-for(let z=0;z<size;z++){
+for(let x=0;x<SIZE;x++)
+for(let z=0;z<SIZE;z++){
 block(x,-1,z,2);
 block(x,0,z,1);
 if(Math.random()>.985){
@@ -148,7 +207,7 @@ function collide(p){
 for(let b of blocks){
 if(Math.abs(p.x-b.position.x)<.6 &&
 Math.abs(p.z-b.position.z)<.6 &&
-Math.abs(p.y-height/2-b.position.y)<1.1) return true;
+Math.abs(p.y-HEIGHT/2-b.position.y)<1.1) return true;
 }
 return false;
 }
@@ -156,7 +215,7 @@ return false;
 function interact(place){
 raycaster.setFromCamera({x:0,y:0},camera);
 const h=raycaster.intersectObjects(scene.children)[0];
-if(!h) return;
+if(!h)return;
 if(place){
 const p=h.object.position.clone().add(h.face.normal);
 block(p.x,p.y,p.z,selected);
@@ -175,17 +234,25 @@ event.target.classList.add("active");
 function loop(){
 requestAnimationFrame(loop);
 vel.y-=.01;
+
 const old=yaw.position.clone();
-yaw.position.x+= (move.r-move.l)*.12;
-yaw.position.z+= (move.b-move.f)*.12;
+yaw.position.x+=(move.r-move.l)*.12;
+yaw.position.z+=(move.b-move.f)*.12;
 if(collide(yaw.position)) yaw.position.copy(old);
+
 yaw.position.y+=vel.y;
-if(collide(yaw.position)){yaw.position.y=old.y;vel.y=0;canJump=true}
+if(collide(yaw.position)){
+yaw.position.y=old.y;
+vel.y=0;
+canJump=true;
+}
+
 renderer.render(scene,camera);
 }
 </script>
 </body>
 </html>
+
 
 
 
