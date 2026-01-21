@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Direct Start</title>
+<title>Minecraft Fixed Inventory</title>
 <style>
 body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
 canvas{width:100%;height:100%;display:block}
@@ -19,10 +19,12 @@ canvas{width:100%;height:100%;display:block}
 #u{bottom:140px;left:80px} #d{bottom:20px;left:80px} #l{bottom:80px;left:10px} #r{bottom:80px;left:150px}
 .act{position:absolute;width:75px;height:75px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
 #jmp{bottom:20px;right:110px} #put{bottom:110px;right:25px;background:rgba(76,175,80,.8)} #del{bottom:20px;right:25px;background:rgba(244,67,54,.8)}
+
+/* ІНВЕНТАР */
 #inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:6px;border-radius:8px;pointer-events:auto}
-.slot{width:40px;height:40px;border:2px solid #555;background-size:cover}
+.slot{width:45px;height:45px;border:3px solid #555;background-size:cover;image-rendering:pixelated}
 .slot.active{border-color:#fff;box-shadow:0 0 10px #fff}
-#save-anim{position:absolute;top:60px;right:10px;color:#fff;background:rgba(0,0,0,0.5);padding:5px 10px;border-radius:5px;display:none}
+#save-anim{position:absolute;top:70px;right:10px;color:#fff;background:rgba(0,0,0,0.5);padding:5px 10px;border-radius:5px;display:none}
 </style>
 </head>
 <body>
@@ -30,7 +32,7 @@ canvas{width:100%;height:100%;display:block}
 <div id="crosshair"></div>
 
 <div id="ui">
-    <div id="save-anim">Saving...</div>
+    <div id="save-anim">Saved</div>
     <div id="inv">
         <div class="slot active" id="s1" onclick="sel(1,event)"></div>
         <div class="slot" id="s8" onclick="sel(8,event)"></div>
@@ -73,10 +75,78 @@ function init() {
     scene.background = new THREE.Color(0x87ceeb);
     scene.fog = new THREE.Fog(0x87ceeb, 25, 75);
 
-    texs[1] = mkTex('#5d8233', '#4a6929');
-    texs[2] = mkTex('#795548', '#5d4037');
-    texs[3] = mkTex('#8
+    // Генерація текстур
+    texs[1] = mkTex('#5d8233', '#4a6929'); // Трава
+    texs[2] = mkTex('#795548', '#5d4037'); // Земля
+    texs[3] = mkTex('#808080', '#606060'); // Камінь
+    texs[4] = mkTex('#6d4c41', '#4e342e'); // Стовбур
+    texs[5] = mkTex('#1e88e5', '#1565c0'); // Вода
+    texs[6] = mkTex('#2e7d32', '#1b5e20'); // Листя
+    texs[7] = mkTex('#202020', '#000000'); // Бедрок
+    texs[8] = mkTex('#bc986a', '#967342', 'planks'); // Дошки
+    texs[9] = mkTex('#b53f3f', '#8c2f2f', 'brick'); // Цегла
+    texs[10] = mkTex('#795548', '#2e7d32', 'sapling'); // Саджанець
 
+    // Оновлення іконок інвентарю
+    const slotsMap = {1:1, 8:8, 9:9, 3:3, 10:10};
+    for(let id in slotsMap) {
+        const el = document.getElementById('s' + id);
+        if(el) el.style.backgroundImage = `url(${texs[id].image.toDataURL()})`;
+    }
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    pitch = new THREE.Object3D(); pitch.add(camera);
+    yaw = new THREE.Object3D(); yaw.add(pitch);
+    scene.add(yaw);
+
+    renderer = new THREE.WebGLRenderer({antialias: false});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+    ray = new THREE.Raycaster();
+
+    const saved = localStorage.getItem('mc_save');
+    if (saved) {
+        try {
+            const data = JSON.parse(saved);
+            yaw.position.copy(data.pos);
+            yaw.rotation.y = data.rot.y;
+            pitch.rotation.x = data.rot.x;
+            data.blocks.forEach(b => addB(b.x, b.y, b.z, b.t));
+        } catch(e) { createInitialWorld(); }
+    } else {
+        createInitialWorld();
+    }
+
+    setupControls();
+    setInterval(saveWorld, 5000);
+    loop();
+}
+
+function createInitialWorld() {
+    yaw.position.set(20, 10, 20);
+    for(let x=0; x<40; x++) for(let z=0; z<40; z++) {
+        const dist = Math.sqrt((x-20)**2 + (z-20)**2);
+        if(dist < 6) { addB(x, 0, z, 5); addB(x, -1, z, 2); } 
+        else { addB(x, 0, z, 1); addB(x, -1, z, 2); }
+        for(let y=-2; y>-4; y--) addB(x, y, z, 3);
+        addB(x, -4, z, 7);
+    }
+}
+
+function addB(x, y, z, t) {
+    const mat = new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1});
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), mat);
+    m.position.set(x, y, z); m.userData.type = t;
+    scene.add(m); blocks.push(m);
+    return m;
+}
+
+function setupControls() {
+    const b = (id, k) => {
+        const el = document.getElementById(id);
+        el.onpointer
 
 
 
