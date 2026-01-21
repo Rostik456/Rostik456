@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Minecraft Abandoned House</title>
+<title>Minecraft Smooth Camera Fix</title>
 <style>
 body{margin:0;overflow:hidden;background:#87ceeb;touch-action:none;font-family:sans-serif}
 canvas{width:100%;height:100%;display:block}
 #ui{position:absolute;inset:0;pointer-events:none;z-index:10}
-.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:55px;height:55px;user-select:none}
-#u{bottom:140px;left:75px} #d{bottom:20px;left:75px} #l{bottom:80px;left:15px} #r{bottom:80px;left:135px}
-.act{position:absolute;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
-#jmp{bottom:20px;right:105px} #put{bottom:100px;right:20px;background:rgba(76,175,80,.8)} #del{bottom:20px;right:20px;background:rgba(244,67,54,.8)}
+.btn{pointer-events:auto;color:#fff;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;position:absolute;width:60px;height:60px;user-select:none}
+#u{bottom:140px;left:80px} #d{bottom:20px;left:80px} #l{bottom:80px;left:10px} #r{bottom:80px;left:150px}
+.act{position:absolute;width:75px;height:75px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid #fff;pointer-events:auto;color:#fff;font-weight:bold}
+#jmp{bottom:20px;right:110px} #put{bottom:110px;right:25px;background:rgba(76,175,80,.8)} #del{bottom:20px;right:25px;background:rgba(244,67,54,.8)}
 #inv{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(0,0,0,.6);padding:6px;border-radius:8px;pointer-events:auto}
 .slot{width:35px;height:35px;border:2px solid #555;background-size:cover}
 .slot.active{border-color:#fff;box-shadow:0 0 10px #fff}
-#fs-toggle{position:absolute;top:10px;right:10px;padding:12px;background:rgba(0,0,0,0.7);color:#fff;border:2px solid #fff;border-radius:8px;pointer-events:auto;font-size:12px;font-weight:bold}
+#fs-toggle{position:absolute;top:10px;right:10px;padding:12px;background:rgba(0,0,0,0.7);color:#fff;border:2px solid #fff;border-radius:8px;pointer-events:auto;font-size:12px}
 </style>
 </head>
 <body>
@@ -24,7 +24,8 @@ canvas{width:100%;height:100%;display:block}
     <div id="inv">
         <div class="slot active" id="s1" onclick="sel(1,event)"></div>
         <div class="slot" id="s8" onclick="sel(8,event)"></div>
-        <div class="slot" id="s9" onclick="sel(9,event)"></div> <div class="slot" id="s3" onclick="sel(3,event)"></div>
+        <div class="slot" id="s9" onclick="sel(9,event)"></div> 
+        <div class="slot" id="s3" onclick="sel(3,event)"></div>
         <div class="slot" id="s4" onclick="sel(4,event)"></div>
     </div>
     <div class="btn" id="u">▲</div><div class="btn" id="d">▼</div>
@@ -46,13 +47,8 @@ let move = {f:0, b:0, l:0, r:0}, vel = 0, canJ = false, blocks = [], selected = 
 const texs = {};
 
 window.toggleFS = function() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(e => {
-            alert(`Помилка: ${e.message}`);
-        });
-    } else {
-        document.exitFullscreen();
-    }
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
 }
 
 function mkTex(c1, c2, pattern='noise') {
@@ -61,18 +57,10 @@ function mkTex(c1, c2, pattern='noise') {
     ctx.fillStyle = c1; ctx.fillRect(0,0,16,16);
     ctx.fillStyle = c2;
     if(pattern === 'planks') {
-        ctx.fillRect(0, 7, 16, 2); ctx.fillRect(0, 15, 16, 1);
-        ctx.fillRect(7, 0, 2, 7); ctx.fillRect(12, 8, 2, 7);
+        ctx.fillRect(0, 7, 16, 2); ctx.fillRect(7, 0, 2, 7);
     } else if (pattern === 'brick') {
-        for (let y = 0; y < 16; y += 4) {
-            ctx.fillRect(0, y, 16, 1); // Горизонтальні лінії
-        }
-        for (let x = 0; x < 16; x += 8) {
-            ctx.fillRect(x, 0, 1, 16); // Вертикальні лінії
-        }
-        for (let x = 4; x < 16; x += 8) {
-            ctx.fillRect(x, 4, 1, 8); // Зміщення вертикальних ліній
-        }
+        for (let y = 0; y < 16; y += 4) ctx.fillRect(0, y, 16, 1);
+        for (let x = 0; x < 16; x += 8) ctx.fillRect(x, 0, 1, 16);
     } else {
         for(let i=0; i<32; i++) ctx.fillRect(Math.random()*16, Math.random()*16, 1, 1);
     }
@@ -83,63 +71,60 @@ init();
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 20, 70);
+    scene.fog = new THREE.Fog(0x87ceeb, 25, 75);
 
-    texs[1] = mkTex('#5d8233', '#4a6929'); // трава
-    texs[2] = mkTex('#795548', '#5d4037'); // земля
-    texs[3] = mkTex('#808080', '#606060'); // камінь
-    texs[4] = mkTex('#6d4c41', '#4e342e'); // колода
-    texs[5] = mkTex('#1e88e5', '#1565c0'); // вода
-    texs[6] = mkTex('#2e7d32', '#1b5e20'); // листя
-    texs[7] = mkTex('#202020', '#000000'); // бедрок
-    texs[8] = mkTex('#bc986a', '#967342', 'planks'); // дошки
-    texs[9] = mkTex('#b53f3f', '#8c2f2f', 'brick'); // ЦЕГЛА
+    texs[1] = mkTex('#5d8233', '#4a6929');
+    texs[2] = mkTex('#795548', '#5d4037');
+    texs[3] = mkTex('#808080', '#606060');
+    texs[4] = mkTex('#6d4c41', '#4e342e');
+    texs[5] = mkTex('#1e88e5', '#1565c0');
+    texs[6] = mkTex('#2e7d32', '#1b5e20');
+    texs[7] = mkTex('#202020', '#000000');
+    texs[8] = mkTex('#bc986a', '#967342', 'planks');
+    texs[9] = mkTex('#b53f3f', '#8c2f2f', 'brick');
 
-    const slots = [1, 8, 9, 3, 4]; // Додав цеглу в інвентар
-    slots.forEach(id => {
-        document.getElementById('s'+id).style.backgroundImage = `url(${texs[id].image.toDataURL()})`;
-    });
+    [1, 8, 9, 3, 4].forEach(id => document.getElementById('s'+id).style.backgroundImage = `url(${texs[id].image.toDataURL()})`);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     pitch = new THREE.Object3D(); pitch.add(camera);
     yaw = new THREE.Object3D(); yaw.add(pitch);
-    yaw.position.set(15, 10, 15); scene.add(yaw);
+    yaw.position.set(20, 10, 20); scene.add(yaw);
 
     renderer = new THREE.WebGLRenderer({antialias: false});
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.4));
     ray = new THREE.Raycaster();
-
     createWorld();
 
     const b = (id, k) => {
         const el = document.getElementById(id);
-        el.addEventListener('pointerdown', (e) => { e.preventDefault(); move[k] = 1; });
-        el.addEventListener('pointerup', (e) => { e.preventDefault(); move[k] = 0; });
-        el.addEventListener('pointerleave', () => { move[k] = 0; });
+        el.onpointerdown = (e) => { e.stopPropagation(); move[k] = 1; };
+        el.onpointerup = (e) => { move[k] = 0; };
+        el.onpointerleave = () => { move[k] = 0; };
     };
     b("u","f"); b("d","b"); b("l","l"); b("r","r");
 
-    document.getElementById("jmp").onpointerdown = (e) => { e.preventDefault(); if(canJ) vel = 0.22; };
-    document.getElementById("put").onpointerdown = (e) => { e.preventDefault(); interact(true); };
-    document.getElementById("del").onpointerdown = (e) => { e.preventDefault(); interact(false); };
+    document.getElementById("jmp").onpointerdown = (e) => { if(canJ) vel = 0.22; e.stopPropagation(); };
+    document.getElementById("put").onpointerdown = (e) => { interact(true); e.stopPropagation(); };
+    document.getElementById("del").onpointerdown = (e) => { interact(false); e.stopPropagation(); };
 
-    let lx, ly, isL = false;
-    document.addEventListener("pointerdown", e => {
-        if(e.target.closest(".btn") || e.target.closest(".act") || e.target.closest(".slot") || e.id === "fs-toggle") return;
-        lx = e.clientX; ly = e.clientY; isL = true;
+    // ВИПРАВЛЕНА КАМЕРА
+    let lx, ly, touchID = null;
+    renderer.domElement.addEventListener("pointerdown", e => {
+        if (touchID === null) { touchID = e.pointerId; lx = e.clientX; ly = e.clientY; }
     });
-    document.addEventListener("pointermove", e => {
-        if (!isL) return;
-        yaw.rotation.y -= (e.clientX - lx) * 0.006;
-        pitch.rotation.x -= (e.clientY - ly) * 0.006;
-        pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
-        lx = e.clientX; ly = e.clientY;
+    renderer.domElement.addEventListener("pointermove", e => {
+        if (e.pointerId === touchID) {
+            const dx = e.clientX - lx; const dy = e.clientY - ly;
+            yaw.rotation.y -= dx * 0.004;
+            pitch.rotation.x -= dy * 0.004;
+            pitch.rotation.x = Math.max(-1.5, Math.min(1.5, pitch.rotation.x));
+            lx = e.clientX; ly = e.clientY;
+        }
     });
-    document.addEventListener("pointerup", () => isL = false);
+    renderer.domElement.addEventListener("pointerup", () => touchID = null);
 
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -151,64 +136,30 @@ function init() {
 }
 
 function addB(x, y, z, t) {
-    const mat = new THREE.MeshLambertMaterial({map: texs[t]});
-    if(t === 5) { mat.transparent = true; mat.opacity = 0.6; }
+    const mat = new THREE.MeshLambertMaterial({map: texs[t], transparent: t===5, opacity: t===5?0.6:1});
     const m = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), mat);
     m.position.set(x, y, z); m.userData.type = t;
     scene.add(m); blocks.push(m);
 }
 
 function createWorld() {
-    const WORLD_SIZE = 40;
-    const LAKE_CENTER_X = WORLD_SIZE / 2;
-    const LAKE_CENTER_Z = WORLD_SIZE / 2;
-    const LAKE_RADIUS = 6;
-    
-    // Випадкова позиція для будинку
-    const houseX = Math.floor(Math.random() * (WORLD_SIZE - 10)) + 5;
-    const houseZ = Math.floor(Math.random() * (WORLD_SIZE - 10)) + 5;
-
-    for(let x=0; x<WORLD_SIZE; x++) {
-        for(let z=0; z<WORLD_SIZE; z++) {
-            const distToLake = Math.sqrt((x-LAKE_CENTER_X)**2 + (z-LAKE_CENTER_Z)**2);
-            
-            if(distToLake < LAKE_RADIUS) { // ОЗЕРО В ЦЕНТРІ
-                addB(x, 0, z, 5); // Вода
-                addB(x, -1, z, 2); // Дно озера
-            } else {
-                addB(x, 0, z, 1); // Трава
-                addB(x, -1, z, 2); // Земля
-            }
-            
-            // Підземні шари
-            for(let y=-2; y>-5; y--) addB(x, y, z, 3); // Камінь
-            addB(x, -5, z, 7); // Бедрок
-            
-            // Дерева
-            if(Math.random() > 0.98 && distToLake >= LAKE_RADIUS + 2 && x > 2 && x < WORLD_SIZE - 2 && z > 2 && z < WORLD_SIZE - 2) {
-                for(let h=1; h<=3; h++) addB(x, h, z, 4);
-                for(let lx=-1; lx<=1; lx++) for(let lz=-1; lz<=1; lz++) for(let ly=3; ly<=5; ly++) if(!(lx===0 && lz===0 && ly===3)) addB(x+lx, ly, z+lz, 6);
-            }
-
-            // ЗАКИНУТИЙ БУДИНОК (5x5x5 з цегли)
-            if (x >= houseX && x < houseX + 5 && z >= houseZ && z < houseZ + 5) {
-                for (let y = 1; y <= 5; y++) {
-                    if (y === 5 || x === houseX || x === houseX + 4 || z === houseZ || z === houseZ + 4) { // Стіни та дах
-                        if (Math.random() > 0.8 && y !== 5) continue; // "Поламані" стіни
-                        if (Math.random() > 0.95 && y === 5) continue; // "Поламаний" дах
-                        addB(x, y, z, 9); // Цегла
-                    }
-                }
-                // Прохід у будинку (двері)
-                if (x === houseX + 2 && z === houseZ && Math.random() < 0.3) { 
-                    // Не завжди є двері, типу завалило
-                } else if (x === houseX + 2 && z === houseZ && Math.random() > 0.7) { // Випадкове "вікно"
-                    addB(x, 3, z, 9);
-                } else if (x === houseX + 2 && z === houseZ + 4 && Math.random() < 0.5) { // Вікно з іншого боку
-                    addB(x, 3, z, 9);
+    for(let x=0; x<40; x++) {
+        for(let z=0; z<40; z++) {
+            const dist = Math.sqrt((x-20)**2 + (z-20)**2);
+            if(dist < 6) { addB(x, 0, z, 5); addB(x, -1, z, 2); } 
+            else { addB(x, 0, z, 1); addB(x, -1, z, 2); 
+                if(Math.random() > 0.985 && x>2 && x<38 && z>2 && z<38) {
+                    for(let h=1; h<=3; h++) addB(x, h, z, 4);
+                    for(let lx=-1; lx<=1; lx++) for(let lz=-1; lz<=1; lz++) for(let ly=3; ly<=5; ly++) if(!(lx===0 && lz===0 && ly===3)) addB(x+lx, ly, z+lz, 6);
                 }
             }
+            for(let y=-2; y>-5; y--) addB(x, y, z, 3);
+            addB(x, -5, z, 7);
         }
+    }
+    // БУДИНОК
+    for(let x=10; x<15; x++) for(let z=10; z<15; z++) for(let y=1; y<5; y++) {
+        if((x===10||x===14||z===10||z===14||y===4) && Math.random()>0.1) addB(x,y,z,9);
     }
 }
 
@@ -216,15 +167,8 @@ function interact(isP) {
     ray.setFromCamera({x:0, y:0}, camera);
     const h = ray.intersectObjects(blocks)[0];
     if(!h || h.distance > 5) return;
-    if(isP) {
-        const p = h.object.position.clone().add(h.face.normal);
-        addB(p.x, p.y, p.z, selected);
-    } else {
-        if(h.object.userData.type !== 7) { 
-            scene.remove(h.object);
-            blocks = blocks.filter(o => o !== h.object);
-        }
-    }
+    if(isP) { const p = h.object.position.clone().add(h.face.normal); addB(p.x, p.y, p.z, selected); }
+    else if(h.object.userData.type !== 7) { scene.remove(h.object); blocks = blocks.filter(o => o !== h.object); }
 }
 
 window.sel = (i, e) => {
@@ -248,7 +192,7 @@ function loop() {
 
     let hit = false;
     for(let b of blocks) {
-        if(b.userData.type === 5) continue; 
+        if(b.userData.type === 5) continue;
         if(Math.abs(yaw.position.x-b.position.x)<0.7 && Math.abs(yaw.position.z-b.position.z)<0.7 && Math.abs(yaw.position.y-1-b.position.y)<1) hit = true;
     }
     if(hit) yaw.position.copy(oldP);
@@ -256,7 +200,7 @@ function loop() {
     yaw.position.y += vel;
     let floor = false;
     for(let b of blocks) {
-        if(b.userData.type === 5) continue; 
+        if(b.userData.type === 5) continue;
         if(Math.abs(yaw.position.x-b.position.x)<0.6 && Math.abs(yaw.position.z-b.position.z)<0.6 && Math.abs(yaw.position.y-1.8-b.position.y)<0.2) floor = true;
     }
     if(floor) { yaw.position.y = oldP.y; vel = 0; canJ = true; } else { canJ = false; }
