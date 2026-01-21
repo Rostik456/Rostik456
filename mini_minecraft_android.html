@@ -3,31 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft JS - Full Collision</title>
+    <title>Minecraft Mobile - Inventory & Buttons</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87ceeb; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
+        
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .touch-btn { position: absolute; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        
+        /* Кнопки пересування */
+        .touch-btn { position: absolute; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.5); border-radius: 8px; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
         #btn-up { bottom: 130px; left: 85px; width: 55px; height: 55px; }
         #btn-down { bottom: 20px; left: 85px; width: 55px; height: 55px; }
         #btn-left { bottom: 75px; left: 20px; width: 55px; height: 55px; }
         #btn-right { bottom: 75px; left: 150px; width: 55px; height: 55px; }
-        #btn-jump { bottom: 30px; right: 40px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.2); }
-        #btn-action { bottom: 130px; right: 40px; width: 80px; height: 60px; background: rgba(76, 175, 80, 0.4); border-color: #4caf50; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid white; transform: translate(-50%, -50%); border-radius: 50%; }
+        
+        /* Кнопки дій */
+        .action-btn { position: absolute; border-radius: 50%; border: 2px solid white; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
+        #btn-jump { bottom: 30px; right: 130px; width: 70px; height: 70px; background: rgba(255,255,255,0.2); }
+        #btn-build { bottom: 110px; right: 30px; width: 80px; height: 80px; background: rgba(76, 175, 80, 0.6); } /* Зелена */
+        #btn-destroy { bottom: 20px; right: 30px; width: 80px; height: 80px; background: rgba(244, 67, 54, 0.6); } /* Червона */
+
+        /* Інвентар */
+        #inventory { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 10px; }
+        .slot { width: 45px; height: 45px; border: 3px solid #444; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .slot.active { border-color: #fff; box-shadow: 0 0 15px #fff; }
+        .block-preview { width: 30px; height: 30px; border-radius: 2px; }
+
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid white; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.7; }
     </style>
 </head>
 <body>
 
 <div id="ui-layer">
     <div id="crosshair"></div>
+    
+    <div id="inventory">
+        <div class="slot active" id="slot-1" onclick="window.setBlock(1)"><div class="block-preview" style="background: #5d8233;"></div></div>
+        <div class="slot" id="slot-2" onclick="window.setBlock(2)"><div class="block-preview" style="background: #795548;"></div></div>
+        <div class="slot" id="slot-3" onclick="window.setBlock(3)"><div class="block-preview" style="background: #808080;"></div></div>
+        <div class="slot" id="slot-4" onclick="window.setBlock(4)"><div class="block-preview" style="background: #614126;"></div></div>
+        <div class="slot" id="slot-5" onclick="window.setBlock(5)"><div class="block-preview" style="background: #1e88e5;"></div></div>
+    </div>
+
     <div class="touch-btn" id="btn-up">W</div>
     <div class="touch-btn" id="btn-down">S</div>
     <div class="touch-btn" id="btn-left">A</div>
     <div class="touch-btn" id="btn-right">D</div>
-    <div class="touch-btn" id="btn-action">BUILD</div>
-    <div class="touch-btn" id="btn-jump">JUMP</div>
+    
+    <div class="action-btn" id="btn-build">BUILD</div>
+    <div class="action-btn" id="btn-destroy">DESTROY</div>
+    <div class="action-btn" id="btn-jump">JUMP</div>
 </div>
 
 <script type="importmap">
@@ -42,10 +67,19 @@
     let velocity = new THREE.Vector3(0, 0, 0);
     let canJump = false;
     let objects = [];
+    let selectedBlock = 1;
     let lastTouchX = 0, lastTouchY = 0;
 
-    const playerRadius = 0.35; // Ширина персонажа
-    const playerHeight = 1.7;  // Зріст персонажа
+    const playerRadius = 0.35;
+    const playerHeight = 1.7;
+
+    const blockColors = {
+        1: 0x5d8233, // Трава
+        2: 0x795548, // Земля
+        3: 0x808080, // Камінь
+        4: 0x614126, // Дерево
+        5: 0x1e88e5  // Вода
+    };
 
     init();
 
@@ -74,18 +108,14 @@
         scene.add(new THREE.AmbientLight(0xffffff, 1.5));
         raycaster = new THREE.Raycaster();
 
-        // Світ
+        // Початкова підлога
         for(let x=0; x<20; x++) {
             for(let z=0; z<20; z++) {
-                addBlock(x, 0, z, 0x5d8233);
-                if(x === 12 && z === 12) { // Тестова стіна
-                    addBlock(12, 1, 12, 0x808080);
-                    addBlock(12, 2, 12, 0x808080);
-                }
+                addBlock(x, 0, z, 1);
             }
         }
 
-        // Керування
+        // Керування рухом
         const setupBtn = (id, key) => {
             const el = document.getElementById(id);
             el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); move[key] = 1; });
@@ -94,56 +124,74 @@
         setupBtn('btn-up', 'f'); setupBtn('btn-down', 'b');
         setupBtn('btn-left', 'l'); setupBtn('btn-right', 'r');
 
+        // Стрибок
         document.getElementById('btn-jump').addEventListener('touchstart', (e) => {
             e.preventDefault(); e.stopPropagation();
             if(canJump) { velocity.y = 0.2; canJump = false; }
         });
 
-        document.getElementById('btn-action').addEventListener('touchstart', (e) => {
+        // БУДУВАТИ
+        document.getElementById('btn-build').addEventListener('touchstart', (e) => {
             e.preventDefault(); e.stopPropagation();
             interact(true);
         });
 
+        // ЛАМАТИ (ОКРЕМА КНОПКА)
+        document.getElementById('btn-destroy').addEventListener('touchstart', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            interact(false);
+        });
+
+        // Обертання камерою (тільки якщо не тиснемо кнопки)
         document.addEventListener('touchstart', (e) => {
-            if (e.target.classList.contains('touch-btn')) return;
+            if (e.target.closest('.touch-btn') || e.target.closest('.action-btn') || e.target.closest('.slot')) return;
             lastTouchX = e.touches[0].clientX;
             lastTouchY = e.touches[0].clientY;
-            setTimeout(() => interact(false), 200);
         });
 
         document.addEventListener('touchmove', (e) => {
-            if (e.target.classList.contains('touch-btn')) return;
+            if (e.target.closest('.touch-btn') || e.target.closest('.action-btn') || e.target.closest('.slot')) return;
             const touch = e.touches[0];
             const dx = touch.clientX - lastTouchX;
             const dy = touch.clientY - lastTouchY;
-            yawObj.rotation.y -= dx * 0.005;
-            pitchObj.rotation.x -= dy * 0.005;
+            yawObj.rotation.y -= dx * 0.006;
+            pitchObj.rotation.x -= dy * 0.006;
             pitchObj.rotation.x = Math.max(-1.5, Math.min(1.5, pitchObj.rotation.x));
             lastTouchX = touch.clientX;
             lastTouchY = touch.clientY;
         }, { passive: false });
 
+        // Функція зміни блоку для інвентаря
+        window.setBlock = (id) => {
+            selectedBlock = id;
+            document.querySelectorAll('.slot').forEach((s, i) => {
+                s.classList.toggle('active', i === id - 1);
+            });
+        };
+
         loop();
     }
 
-    function addBlock(x, y, z, color) {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color}));
+    function addBlock(x, y, z, type) {
+        const material = new THREE.MeshLambertMaterial({
+            color: blockColors[type],
+            transparent: type === 5,
+            opacity: type === 5 ? 0.6 : 1
+        });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), material);
         mesh.position.set(Math.floor(x), Math.floor(y), Math.floor(z));
+        mesh.userData.type = type;
         scene.add(mesh);
         objects.push(mesh);
     }
 
-    // ГОЛОВНА ФУНКЦІЯ КОЛІЗІЇ
     function checkCollision(pos) {
         for(let obj of objects) {
+            if(obj.userData.type === 5) continue; // Вода не має колізії
             let dx = Math.abs(pos.x - obj.position.x);
             let dy = Math.abs((pos.y - playerHeight/2) - obj.position.y);
             let dz = Math.abs(pos.z - obj.position.z);
-            
-            // Якщо гравець перетинає межі блоку (AABB)
-            if(dx < 0.5 + playerRadius && dz < 0.5 + playerRadius && dy < 0.5 + playerHeight/2) {
-                return true;
-            }
+            if(dx < 0.5 + playerRadius && dz < 0.5 + playerRadius && dy < 0.5 + playerHeight/2) return true;
         }
         return false;
     }
@@ -154,8 +202,10 @@
         if (hits.length > 0 && hits[0].distance < 6) {
             if (isPlace) {
                 const p = hits[0].object.position.clone().add(hits[0].face.normal);
-                addBlock(p.x, p.y, p.z, 0x795548);
+                addBlock(p.x, p.y, p.z, selectedBlock);
             } else {
+                // Не ламаємо підлогу на y=0 для безпеки
+                if(hits[0].object.position.y === 0) return;
                 scene.remove(hits[0].object);
                 objects = objects.filter(o => o !== hits[0].object);
             }
@@ -164,37 +214,30 @@
 
     function loop() {
         requestAnimationFrame(loop);
-        
         let oldPos = yawObj.position.clone();
-        velocity.y -= 0.01; // Гравітація
+        velocity.y -= 0.01;
 
-        // Розрахунок напрямку руху
         let moveVec = new THREE.Vector3(move.r - move.l, 0, move.b - move.f);
-        moveVec.applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(0.1);
+        moveVec.applyQuaternion(yawObj.quaternion).normalize().multiplyScalar(0.12);
 
-        // Перевірка колізії по осі X
         yawObj.position.x += moveVec.x;
         if(checkCollision(yawObj.position)) yawObj.position.x = oldPos.x;
 
-        // Перевірка колізії по осі Z
         yawObj.position.z += moveVec.z;
         if(checkCollision(yawObj.position)) yawObj.position.z = oldPos.z;
 
-        // Перевірка колізії по осі Y (Стрибок/Падіння)
         canJump = false;
         yawObj.position.y += velocity.y;
         if(checkCollision(yawObj.position)) {
-            if(velocity.y < 0) canJump = true; // Ми на землі
+            if(velocity.y < 0) canJump = true;
             yawObj.position.y = oldPos.y;
             velocity.y = 0;
         }
-
         renderer.render(scene, camera);
     }
 </script>
 </body>
 </html>
-
 
 
 
