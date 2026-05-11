@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Frontline War Mobile</title>
+    <style>
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body { font-family: sans-serif; background: #0a0a0a; color: #0f0; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* МЕНЮ (Мобільне) */
+        #menu-screen { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .menu-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; }
+        .upg-card { border: 1px solid #0f0; padding: 10px; text-align: center; background: #111; font-size: 12px; }
+        .btn { background: #000; color: #0f0; border: 1px solid #0f0; padding: 12px; cursor: pointer; width: 100%; font-size: 14px; text-transform: uppercase; }
+        .btn:active { background: #0f0; color: #000; }
+
+        /* ІНТЕРФЕЙС ГРИ */
+        #stats { background: #000; display: flex; justify-content: space-around; align-items: center; padding: 10px; border-bottom: 2px solid #0f0; font-size: 14px; }
+        
+        #game-container { position: relative; flex-grow: 1; width: 100vw; overflow: hidden; background: #050505; }
+        #map { position: absolute; width: 1200px; height: 100%; background: #080808; }
+        canvas { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+
+        /* ОБ'ЄКТИ */
+        .city { width: 60px; height: 60px; position: absolute; border: 2px solid; background: rgba(0,0,0,0.8); z-index: 2; font-size: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .ruins { opacity: 0.5; filter: grayscale(1); border-style: dotted !important; }
+        .hq { width: 80px !important; height: 80px !important; font-weight: bold; }
+        
+        .hp-bar { width: 80%; height: 5px; background: #333; margin-top: 5px; }
+        .hp-fill { height: 100%; transition: width 0.3s; }
+
+        .unit { width: 18px; height: 18px; position: absolute; z-index: 10; border-radius: 4px; border: 1px solid #fff; }
+        .player-unit { background: #0f0; box-shadow: 0 0 5px #0f0; }
+        .bot-unit { background: #f00; box-shadow: 0 0 5px #f00; }
+
+        .aa-turret { width: 35px; height: 35px; background: #111; border: 2px solid #0ff; position: absolute; z-index: 5; border-radius: 50%; }
+        .shahed { width: 20px; height: 20px; background: #ff0; position: absolute; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); z-index: 15; }
+        .bullet { width: 5px; height: 5px; background: #fff; position: absolute; z-index: 20; border-radius: 50%; }
+
+        /* КНОПКИ КЕРУВАННЯ (Знизу) */
+        #ui { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 10px; background: #000; border-top: 2px solid #0f0; }
+        .ui-btn { font-size: 11px; padding: 10px 2px; text-align: center; }
+        .active { background: #0f0 !important; color: #000 !important; }
+    </style>
+</head>
+<body>
+
+<div id="menu-screen">
+    <h2 style="margin-top:0">FRONT WAR: MOBILE</h2>
+    <div id="menu-gold" style="margin-bottom:15px">💰 Золото: 500</div>
+    <div class="menu-row">
+        <div class="upg-card">БРОНЯ ШТАБУ<br><span id="cost-hq">100</span>💰<button class="btn" onclick="buyUpgrade('hq')">↑</button></div>
+        <div class="upg-card">HP ПІХОТИ<br><span id="cost-inf">150</span>💰<button class="btn" onclick="buyUpgrade('inf')">↑</button></div>
+        <div class="upg-card">ШАХЕД УРОН<br><span id="cost-sh">200</span>💰<button class="btn" onclick="buyUpgrade('sh')">↑</button></div>
+        <div class="upg-card">ППО РАДІУС<br><span id="cost-aa">150</span>💰<button class="btn" onclick="buyUpgrade('aa')">↑</button></div>
+    </div>
+    <button class="btn" style="margin-top:20px; padding:20px" onclick="toggleMenu(false)">ГРАТИ</button>
+</div>
+
+<div id="stats">
+    <div>💰 <span id="gold">500</span></div>
+    <div>🏥 HQ: <span id="p-hq-hp">100</span>%</div>
+    <button onclick="toggleMenu(true)" style="background:none; color:#0f0; border:1px solid #0f0; padding:5px">МЕНЮ</button>
+</div>
+
+<div id="game-container">
+    <div id="map">
+        <canvas id="frontCanvas"></canvas>
+        <div id="player-hq" class="city hq" data-hp="1500" data-maxhp="1500" style="left: 10px; top: 40%; border-color:#0f0; color:#0f0;">ШТАБ UA<div class="hp-bar"><div class="hp-fill" style="width:100%; background:#0f0"></div></div></div>
+        <div id="bot-hq" class="city hq" data-hp="1500" data-maxhp="1500" style="left: 1110px; top: 40%; border-color:#f00; color:#f00;">ENEMY<div class="hp-bar"><div class="hp-fill" style="width:100%; background:#f00"></div></div></div>
+    </div>
+</div>
+
+<div id="ui">
+    <button class="btn ui-btn" id="btn-army" onclick="setMode('army')">ПІХОТА<br>50</button>
+    <button class="btn ui-btn" id="btn-build" onclick="setMode('build')">МІСТО<br>150</button>
+    <button class="btn ui-btn" id="btn-aa" onclick="setMode('aa')">ППО<br>200</button>
+    <button class="btn ui-btn" id="btn-strike" onclick="setMode('strike')">ШАХЕД<br>120</button>
+</div>
+
+<script>
+    let state = {
+        gold: 500,
+        mode: 'army',
+        paused: true,
+        upgrades: { hq: 1500, inf: 70, sh: 250, aa: 250 },
+        costs: { hq: 100, inf: 150, sh: 200, aa: 150 },
+        frontPoints: []
+    };
+
+    const map = document.getElementById('map');
+    const canvas = document.getElementById('frontCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function initGame() {
+        canvas.width = 1200;
+        canvas.height = map.offsetHeight;
+        state.frontPoints = [];
+        for(let i=0; i <= canvas.height; i += 25) state.frontPoints.push({x: 600, y: i});
+        setMode('army');
+    }
+
+    function toggleMenu(show) {
+        state.paused = show;
+        document.getElementById('menu-screen').style.display = show ? 'flex' : 'none';
+        document.getElementById('menu-gold').innerText = `💰 Золото: ${state.gold}`;
+    }
+
+    function buyUpgrade(type) {
+        if(state.gold >= state.costs[type]) {
+            state.gold -= state.costs[type];
+            state.costs[type] = Math.round(state.costs[type] * 1.7);
+            if(type === 'hq') {
+                state.upgrades.hq += 500;
+                let hq = document.getElementById('player-hq');
+                hq.dataset.maxhp = state.upgrades.hq;
+                hq.dataset.hp = state.upgrades.hq;
+            } else if(type === 'inf') state.upgrades.inf += 30;
+            else if(type === 'sh') state.upgrades.sh += 150;
+            else if(type === 'aa') state.upgrades.aa += 50;
+            
+            document.getElementById(`cost-${type}`).innerText = state.costs[type];
+            document.getElementById('menu-gold').innerText = `💰 Золото: ${state.gold}`;
+        }
+    }
+
+    function setMode(m) {
+        state.mode = m;
+        document.querySelectorAll('.ui-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + m).classList.add('active');
+    }
+
+    // Керування для телефону (Клік по карті)
+    map.addEventListener('touchstart', (e) => {
+        if(state.paused) return;
+        const touch = e.touches[0];
+        const rect = map.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        spawnAction(x, y);
+    });
+
+    // Для ПК
+    map.addEventListener('mousedown', (e) => {
+        if(state.paused) return;
+        const rect = map.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        spawnAction(x, y);
+    });
+
+    function spawnAction(x, y) {
+        if(state.mode === 'army' && state.gold >= 50) {
+            spawnUnit(80, y, 'player');
+            state.gold -= 50;
+        } else if(state.mode === 'build' && state.gold >= 150) {
+            spawnCity(x, y, 'player');
+            state.gold -= 150;
+        } else if(state.mode === 'aa' && state.gold >= 200) {
+            spawnAA(x, y, 'player');
+            state.gold -= 200;
+        } else if(state.mode === 'strike' && state.gold >= 120) {
+            launchShahed(80, y, x, y, 'player');
+            state.gold -= 120;
+        }
+        document.getElementById('gold').innerText = state.gold;
+    }
+
+    function spawnUnit(x, y, type) {
+        const u = document.createElement('div');
+        u.className = `unit ${type}-unit`;
+        u.style.left = x + 'px'; u.style.top = (y - 9) + 'px';
+        u.dataset.hp = type === 'player' ? state.upgrades.inf : 60;
+        u.dataset.type = type;
+        map.appendChild(u);
+    }
+
+    function spawnCity(x, y, type) {
+        const c = document.createElement('div');
+        c.className = `city ${type}-city`;
+        c.dataset.hp = 400; c.dataset.maxhp = 400;
+        c.style.left = (x-30)+'px'; c.style.top = (y-30)+'px';
+        c.innerHTML = `МІСТО<div class="hp-bar"><div class="hp-fill" style="width:100%; background:#0f0"></div></div>`;
+        map.appendChild(c);
+    }
+
+    function spawnAA(x, y, type) {
+        const aa = document.createElement('div');
+        aa.className = 'aa-turret';
+        aa.style.left = (x-17)+'px'; aa.style.top = (y-17)+'px';
+        aa.dataset.type = type;
+        map.appendChild(aa);
+    }
+
+    function damage(obj, amt) {
+        if(obj.classList.contains('ruins')) return;
+        obj.dataset.hp -= amt;
+        let fill = obj.querySelector('.hp-fill');
+        if(fill) fill.style.width = (obj.dataset.hp / obj.dataset.maxhp * 100) + '%';
+        if(obj.dataset.hp <= 0) {
+            if(obj.classList.contains('unit')) obj.remove();
+            else if(obj.classList.contains('hq')) { alert("ГРА ЗАКІНЧЕНА"); location.reload(); }
+            else { obj.classList.add('ruins'); obj.innerHTML = "РУЇНИ"; }
+        }
+    }
+
+    function shoot(from, to) {
+        const b = document.createElement('div');
+        b.className = 'bullet';
+        let fx = parseFloat(from.style.left)+9, fy = parseFloat(from.style.top)+9;
+        b.style.left = fx+'px'; b.style.top = fy+'px';
+        map.appendChild(b);
+        let tx = parseFloat(to.style.left)+10, ty = parseFloat(to.style.top)+10;
+        let angle = Math.atan2(ty-fy, tx-fx);
+        let move = setInterval(() => {
+            if(state.paused) return;
+            let cx = parseFloat(b.style.left), cy = parseFloat(b.style.top);
+            b.style.left = (cx + Math.cos(angle)*15)+'px';
+            b.style.top = (cy + Math.sin(angle)*15)+'px';
+            if(Math.abs(cx-tx)<20 && Math.abs(cy-ty)<20) {
+                damage(to, 10); b.remove(); clearInterval(move);
+            }
+            if(cx<0 || cx>1200) { b.remove(); clearInterval(move); }
+        }, 30);
+    }
+
+    function moveLogic() {
+        if(state.paused) return;
+        document.querySelectorAll('.unit').forEach(u => {
+            let x = parseFloat(u.style.left), y = parseFloat(u.style.top);
+            let type = u.dataset.type;
+            
+            let enemyClass = type === 'player' ? '.bot-unit, .bot-city:not(.ruins), #bot-hq' : '.player-unit, .player-city:not(.ruins), #player-hq';
+            let target = null;
+            document.querySelectorAll(enemyClass).forEach(e => {
+                let ex = parseFloat(e.style.left), ey = parseFloat(e.style.top);
+                if(Math.sqrt((x-ex)**2 + (y-ey)**2) < 180) target = e;
+            });
+
+            if(target) {
+                if(Math.random() > 0.85) shoot(u, target);
+            } else {
+                let speed = type === 'player' ? 2 : -2;
+                u.style.left = (x + speed) + 'px';
+                let pIdx = Math.floor(y / 25);
+                if(state.frontPoints[pIdx]) {
+                    if(type === 'player' && x > state.frontPoints[pIdx].x) state.frontPoints[pIdx].x += 0.4;
+                    if(type === 'bot' && x < state.frontPoints[pIdx].x) state.frontPoints[pIdx].x -= 0.4;
+                }
+            }
+        });
+        
+        // ППО
+        document.querySelectorAll('.aa-turret').forEach(aa => {
+            let ax = parseFloat(aa.style.left), ay = parseFloat(aa.style.top);
+            document.querySelectorAll('.shahed').forEach(s => {
+                if(s.dataset.owner !== aa.dataset.type) {
+                    if(Math.sqrt((ax-parseFloat(s.style.left))**2 + (ay-parseFloat(s.style.top))**2) < state.upgrades.aa) {
+                        s.dataset.hp -= 2;
+                        if(s.dataset.hp <= 0) s.remove();
+                    }
+                }
+            });
+        });
+    }
+
+    function launchShahed(sx, sy, tx, ty, owner) {
+        const s = document.createElement('div');
+        s.className = 'shahed'; s.dataset.owner = owner; s.dataset.hp = 20;
+        s.style.left = sx+'px'; s.style.top = sy+'px';
+        map.appendChild(s);
+        let fly = setInterval(() => {
+            if(state.paused) return;
+            if(!s.parentNode) { clearInterval(fly); return; }
+            let cx = parseFloat(s.style.left), cy = parseFloat(s.style.top);
+            let dx = tx-cx, dy = ty-cy, d = Math.sqrt(dx*dx+dy*dy);
+            if(d < 15) {
+                document.querySelectorAll('.city, .unit').forEach(obj => {
+                    let ox = parseFloat(obj.style.left), oy = parseFloat(obj.style.top);
+                    if(Math.sqrt((tx-ox)**2 + (ty-oy)**2) < 100) damage(obj, owner==='player'?state.upgrades.sh:200);
+                });
+                s.remove(); clearInterval(fly);
+            } else {
+                s.style.left = (cx + dx/d*10)+'px'; s.style.top = (cy + dy/d*10)+'px';
+            }
+        }, 30);
+    }
+
+    function drawFront() {
+        ctx.clearRect(0, 0, 1200, canvas.height);
+        ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 5;
+        ctx.moveTo(state.frontPoints[0].x, 0);
+        state.frontPoints.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.stroke();
+    }
+
+    function botAI() {
+        if(state.paused) return;
+        if(Math.random() > 0.5) spawnUnit(1100, Math.random()*canvas.height, 'bot');
+        if(Math.random() > 0.8) {
+            let t = document.querySelectorAll('.player-city:not(.ruins), #player-hq');
+            let target = t[Math.floor(Math.random()*t.length)];
+            launchShahed(1100, 275, parseFloat(target.style.left), parseFloat(target.style.top), 'bot');
+        }
+    }
+
+    window.onload = () => {
+        initGame();
+        setInterval(moveLogic, 40);
+        setInterval(drawFront, 50);
+        setInterval(() => {
+            if(!state.paused) {
+                state.gold += document.querySelectorAll('.player-city:not(.ruins)').length * 20 + 10;
+                document.getElementById('gold').innerText = state.gold;
+                document.getElementById('p-hq-hp').innerText = Math.round(document.getElementById('player-hq').dataset.hp / state.upgrades.hq * 100);
+                botAI();
+            }
+        }, 2000);
+    };
+</script>
+</body>
+</html>
